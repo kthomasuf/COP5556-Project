@@ -36,7 +36,7 @@ Adapted from pascal.g by  Hakki Dogusan, Piet Schoutteten and Marton Papp
 // $antlr-format alignTrailingComments true, columnLimit 150, minEmptyLines 1, maxEmptyLinesToKeep 1, reflowComments false, useTab false
 // $antlr-format allowShortRulesOnASingleLine false, allowShortBlocksOnASingleLine true, alignSemicolons hanging, alignColons hanging
 
-grammar pascal;
+grammar delphi;
 
 options {
     caseInsensitive = true;
@@ -174,11 +174,13 @@ structuredType
     | unpackedStructuredType
     ;
 
+// Added class type
 unpackedStructuredType
     : arrayType
     | recordType
     | setType
     | fileType
+    | classType
     ;
 
 stringtype
@@ -371,6 +373,7 @@ signedFactor
     : (PLUS | MINUS)? factor
     ;
 
+// Added object instantiation
 factor
     : variable
     | LPAREN expression RPAREN
@@ -379,6 +382,12 @@ factor
     | set_
     | NOT factor
     | bool_
+    | objectInstantiation
+    ;
+
+// Added object instantiation grammar
+objectInstantiation
+    : identifier DOT identifier LPAREN parameterList? RPAREN
     ;
 
 unsignedConstant
@@ -827,4 +836,75 @@ NUM_REAL
 
 fragment EXPONENT
     : ('E') ('+' | '-')? ('0' .. '9')+
+    ;
+
+// General Added Terms
+PRIVATE
+    : 'PRIVATE'
+    ;
+
+PUBLIC
+    : 'PUBLIC'
+    ;
+
+CONSTRUCTOR
+    : 'CONSTRUCTOR'
+    ;
+
+DESTRUCTOR
+    : 'DESTRUCTOR'
+    ;
+
+// Class Implementation
+CLASS
+    : 'CLASS'
+    ;
+
+classType
+    : CLASS classBody END
+    ;
+
+classBody
+    : classSection*
+    ;
+
+classSection
+    : visibilitySpecifier classMemberList
+    ;
+
+visibilitySpecifier
+    : PRIVATE
+    | PUBLIC
+    ;
+
+classMemberList
+    : classMember (SEMI classMember)* SEMI
+    ;
+
+classMember
+    : fieldDeclaration
+    | procedureHeader
+    | functionHeader
+    | constructorDeclaration
+    | destructorDeclaration
+    ;
+
+fieldDeclaration
+    : identifierList COLON type_
+    ;
+
+procedureHeader
+    : PROCEDURE identifier (formalParameterList)?
+    ;
+
+functionHeader
+    : FUNCTION identifier (formalParameterList)? COLON resultType
+    ;
+
+constructorDeclaration
+    : CONSTRUCTOR identifier (formalParameterList)?
+    ;
+
+destructorDeclaration
+    : DESTRUCTOR identifier (formalParameterList)?
     ;
