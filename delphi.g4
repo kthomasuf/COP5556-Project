@@ -180,7 +180,57 @@ unpackedStructuredType
     | recordType
     | setType
     | fileType
-    | classType
+    | classType 
+    ;
+
+// Moved class parser rules
+classType
+    : CLASS classBody END
+    ;
+
+classBody
+    : classSection*
+    ;
+
+classSection
+    : visibilitySpecifier classMemberList
+    ;
+
+visibilitySpecifier
+    : PRIVATE
+    | PUBLIC
+    ;
+
+classMemberList
+    : classMember (SEMI classMember)* SEMI
+    ;
+
+classMember
+    : fieldDeclaration
+    | procedureHeader
+    | functionHeader
+    | constructorDeclaration
+    | destructorDeclaration
+    ;
+
+fieldDeclaration
+    : identifierList COLON type_
+    ;
+
+procedureHeader
+    : PROCEDURE identifier (formalParameterList)?
+    ;
+
+functionHeader
+    : FUNCTION identifier (formalParameterList)? COLON resultType
+    ;
+
+constructorDeclaration
+    : CONSTRUCTOR identifier (formalParameterList)?
+    ;
+
+destructorDeclaration
+    : DESTRUCTOR identifier (formalParameterList)?
     ;
 
 stringtype
@@ -818,27 +868,7 @@ COMMENT_2
     : '{' .*? '}' -> skip
     ;
 
-IDENT
-    : ('A' .. 'Z') ('A' .. 'Z' | '0' .. '9' | '_')*
-    ;
-
-STRING_LITERAL
-    : '\'' ('\'\'' | ~ ('\''))* '\''
-    ;
-
-NUM_INT
-    : ('0' .. '9')+
-    ;
-
-NUM_REAL
-    : ('0' .. '9')+ (('.' ('0' .. '9')+ (EXPONENT)?)? | EXPONENT)
-    ;
-
-fragment EXPONENT
-    : ('E') ('+' | '-')? ('0' .. '9')+
-    ;
-
-// General Added Terms
+// Moved class keyword definitions here due to ANTLR keyword precedence
 PRIVATE
     : 'PRIVATE'
     ;
@@ -860,51 +890,22 @@ CLASS
     : 'CLASS'
     ;
 
-classType
-    : CLASS classBody END
+IDENT
+    : ('A' .. 'Z') ('A' .. 'Z' | '0' .. '9' | '_')*
     ;
 
-classBody
-    : classSection*
+STRING_LITERAL
+    : '\'' ('\'\'' | ~ ('\''))* '\''
     ;
 
-classSection
-    : visibilitySpecifier classMemberList
+NUM_INT
+    : ('0' .. '9')+
     ;
 
-visibilitySpecifier
-    : PRIVATE
-    | PUBLIC
+NUM_REAL
+    : ('0' .. '9')+ (('.' ('0' .. '9')+ (EXPONENT)?)? | EXPONENT)
     ;
 
-classMemberList
-    : classMember (SEMI classMember)* SEMI
-    ;
-
-classMember
-    : fieldDeclaration
-    | procedureHeader
-    | functionHeader
-    | constructorDeclaration
-    | destructorDeclaration
-    ;
-
-fieldDeclaration
-    : identifierList COLON type_
-    ;
-
-procedureHeader
-    : PROCEDURE identifier (formalParameterList)?
-    ;
-
-functionHeader
-    : FUNCTION identifier (formalParameterList)? COLON resultType
-    ;
-
-constructorDeclaration
-    : CONSTRUCTOR identifier (formalParameterList)?
-    ;
-
-destructorDeclaration
-    : DESTRUCTOR identifier (formalParameterList)?
+fragment EXPONENT
+    : ('E') ('+' | '-')? ('0' .. '9')+
     ;
