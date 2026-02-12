@@ -1,3 +1,5 @@
+{Current interpreter cannot handle parameter passing, need to implement that still, so this code will not do anything meaningful}
+
 PROGRAM TestOOP;
 
 TYPE
