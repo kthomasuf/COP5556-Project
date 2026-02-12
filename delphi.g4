@@ -55,6 +55,10 @@ identifier
     : IDENT
     ;
 
+scopedIdentifier
+    : identifier (DOT identifier)*
+    ;
+
 block
     : (
         labelDeclarationPart
@@ -209,8 +213,8 @@ classMember
     : fieldDeclaration
     | procedureHeader
     | functionHeader
-    | constructorDeclaration
-    | destructorDeclaration
+    | constructorHeader
+    | destructorHeader
     ;
 
 fieldDeclaration
@@ -225,11 +229,11 @@ functionHeader
     : FUNCTION identifier (formalParameterList)? COLON resultType
     ;
 
-constructorDeclaration
+constructorHeader
     : CONSTRUCTOR identifier (formalParameterList)?
     ;
 
-destructorDeclaration
+destructorHeader
     : DESTRUCTOR identifier (formalParameterList)?
     ;
 
@@ -316,10 +320,20 @@ procedureAndFunctionDeclarationPart
 procedureOrFunctionDeclaration
     : procedureDeclaration
     | functionDeclaration
+    | constructorDeclaration // Allow constructor and destructor bodies
+    | destructorDeclaration  
     ;
 
 procedureDeclaration
-    : PROCEDURE identifier (formalParameterList)? SEMI block
+    : PROCEDURE scopedIdentifier (formalParameterList)? SEMI block
+    ;
+
+constructorDeclaration
+    : CONSTRUCTOR scopedIdentifier (formalParameterList)? SEMI block
+    ;
+
+destructorDeclaration
+    : DESTRUCTOR scopedIdentifier (formalParameterList)? SEMI block
     ;
 
 formalParameterList
@@ -346,7 +360,7 @@ constList
     ;
 
 functionDeclaration
-    : FUNCTION identifier (formalParameterList)? COLON resultType SEMI block
+    : FUNCTION scopedIdentifier (formalParameterList)? COLON resultType SEMI block
     ;
 
 resultType
@@ -364,8 +378,8 @@ unlabelledStatement
     ;
 
 simpleStatement
-    : assignmentStatement
-    | procedureStatement
+    : procedureStatement
+    | assignmentStatement
     | gotoStatement
     | emptyStatement_
     ;
@@ -470,7 +484,7 @@ element
     ;
 
 procedureStatement
-    : identifier (LPAREN parameterList RPAREN)?
+    : variable (LPAREN parameterList? RPAREN)?
     ;
 
 actualParameter
@@ -909,3 +923,4 @@ NUM_REAL
 fragment EXPONENT
     : ('E') ('+' | '-')? ('0' .. '9')+
     ;
+

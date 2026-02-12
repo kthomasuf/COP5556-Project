@@ -29,6 +29,12 @@ public interface delphiVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitIdentifier(delphiParser.IdentifierContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link delphiParser#scopedIdentifier}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitScopedIdentifier(delphiParser.ScopedIdentifierContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link delphiParser#block}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -233,17 +239,17 @@ public interface delphiVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFunctionHeader(delphiParser.FunctionHeaderContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link delphiParser#constructorDeclaration}.
+	 * Visit a parse tree produced by {@link delphiParser#constructorHeader}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitConstructorDeclaration(delphiParser.ConstructorDeclarationContext ctx);
+	T visitConstructorHeader(delphiParser.ConstructorHeaderContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link delphiParser#destructorDeclaration}.
+	 * Visit a parse tree produced by {@link delphiParser#destructorHeader}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitDestructorDeclaration(delphiParser.DestructorDeclarationContext ctx);
+	T visitDestructorHeader(delphiParser.DestructorHeaderContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link delphiParser#stringtype}.
 	 * @param ctx the parse tree
@@ -370,6 +376,18 @@ public interface delphiVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitProcedureDeclaration(delphiParser.ProcedureDeclarationContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link delphiParser#constructorDeclaration}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitConstructorDeclaration(delphiParser.ConstructorDeclarationContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link delphiParser#destructorDeclaration}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDestructorDeclaration(delphiParser.DestructorDeclarationContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link delphiParser#formalParameterList}.
 	 * @param ctx the parse tree
