@@ -197,6 +197,109 @@ public class Main {
             }
             return Value.VOID;
         }
+        
+        // visit statement lists
+        @Override
+        public Value visitCompoundStatement(delphiParser.CompoundStatementContext ctx) {
+            visit(ctx.statements());
+            return Value.VOID;
+        }
+
+        // relational operator support
+        @Override
+        public Value visitExpression(delphiParser.ExpressionContext ctx) {
+            Value left = visit(ctx.simpleExpression());
+
+            if (ctx.relationaloperator() != null) {
+                Value right = visit(ctx.expression());
+                String operator = ctx.relationaloperator().getText();
+
+                switch (operator.toUpperCase()) {
+                    case "=":
+                        return new Value((left.asInt() == right.asInt()) ? 1 : 0);
+                    case "<>":
+                        return new Value((left.asInt() != right.asInt()) ? 1 : 0);
+                    case "<":
+                        return new Value((left.asInt() < right.asInt()) ? 1 : 0);
+                    case "<=":
+                        return new Value((left.asInt() <= right.asInt()) ? 1 : 0);
+                    case ">":
+                        return new Value((left.asInt() > right.asInt()) ? 1 : 0);
+                    case ">=":
+                        return new Value((left.asInt() >= right.asInt()) ? 1 : 0);
+                    case "IN":
+                        // Requires set support
+                        throw new RuntimeException("IN operator not yet implemented");
+                    default:
+                        throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+
+            return left;
+        }
+        
+        // basic math support, need to add more operators and precedence handling 
+        @Override
+        public Value visitSimpleExpression(delphiParser.SimpleExpressionContext ctx) {
+            Value left = visit(ctx.term());
+
+            if (ctx.additiveoperator() != null) {
+                Value right = visit(ctx.simpleExpression());
+                String operator = ctx.additiveoperator().getText();
+
+                switch (operator.toUpperCase()) {
+                    case "+":
+                        return new Value(left.asInt() + right.asInt());
+                    case "-":
+                        return new Value(left.asInt() - right.asInt());
+                    case "OR":
+                        return new Value((left.asInt() != 0 || right.asInt() != 0) ? 1 : 0);
+                    default:
+                        throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            return left;
+        }
+
+        // multiplicative math support
+        @Override
+        public Value visitTerm(delphiParser.TermContext ctx) {
+            Value left = visit(ctx.signedFactor());
+
+            if (ctx.multiplicativeoperator() != null) {
+                Value right = visit(ctx.term());
+                String operator = ctx.multiplicativeoperator().getText();
+
+                switch (operator.toUpperCase()) {
+                    case "*":
+                        return new Value(left.asInt() * right.asInt());
+                    case "/":
+                        return new Value(left.asInt() / right.asInt());
+                    case "DIV":
+                        return new Value(left.asInt() / right.asInt());
+                    case "MOD":
+                        return new Value(left.asInt() % right.asInt());
+                    case "AND":
+                        return new Value((left.asInt() != 0 && right.asInt() != 0) ? 1 : 0);
+                    default:
+                        throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+
+            return left;
+        }
+
+        // check for sign
+        @Override
+        public Value visitSignedFactor(delphiParser.SignedFactorContext ctx) {
+            Value val = visit(ctx.factor());
+
+            if (ctx.MINUS() != null) {
+                return new Value(-val.asInt());
+            }
+
+            return val;
+        }
 
         // reading values
         @Override
@@ -228,24 +331,7 @@ public class Main {
             }
             return Value.NULL;
         }
-        
-        // visit statement lists
-        @Override
-        public Value visitCompoundStatement(delphiParser.CompoundStatementContext ctx) {
-            visit(ctx.statements());
-            return Value.VOID;
-        }
-        
-        // basic math support, need to add more operators and precedence handling 
-        @Override
-        public Value visitSimpleExpression(delphiParser.SimpleExpressionContext ctx) {
-            Value left = visit(ctx.term());
-            if (ctx.simpleExpression() != null) {
-                Value right = visit(ctx.simpleExpression());
-                return new Value(left.asInt() + right.asInt());
-            }
-            return left;
-        }
+
     }
 
     public static void main(String[] args) {
