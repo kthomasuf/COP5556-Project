@@ -93,6 +93,22 @@ public class Main {
             return Value.VOID;
         }
 
+        // destructor
+        @Override
+        public Value visitDestructorDeclaration(delphiParser.DestructorDeclarationContext ctx) {
+            String fullName = ctx.scopedIdentifier().getText();
+            if (fullName.contains(".")) {
+                String[] parts = fullName.split("\\.");
+                String className = parts[0];
+                ClassSymbol clazz = currentEnv.getClass(className);
+                if (clazz != null) {
+                    clazz.destructorImpl = ctx;
+                    System.out.println("[Interpreter] Linked Destructor to Class '" + className + "'");
+                }
+            }
+            return Value.VOID;
+        }
+
         // execution
 
         // creates new object instance and turns constructor
@@ -142,6 +158,20 @@ public class Main {
                 if (objVal.asInstance() == null) throw new RuntimeException(instanceName + " is not an object!");
 
                 Instance instance = objVal.asInstance();
+
+                // Check for destructor method -- hardcoding not ideal but works
+                if (methodName.equalsIgnoreCase("Destroy")) {
+                    if (instance.type.destructorImpl != null) {
+                        System.out.println("[Runtime] Executing Destructor");
+                        Environment previous = currentEnv;
+                        currentEnv = new Environment(previous);
+                        currentEnv.define("self", objVal);
+                        visit(instance.type.destructorImpl.block());
+                        currentEnv = previous;
+                    }
+                    return Value.VOID;
+                }
+
                 delphiParser.ProcedureDeclarationContext methodCode = instance.type.procedures.get(methodName.toLowerCase());
                 
                 if (methodCode != null) {
@@ -327,6 +357,7 @@ public class Main {
                 }
             }
             if (ctx.objectInstantiation() != null) {
+                System.out.println("[DEBUG] Recognized as objectInstantiation");
                 return visit(ctx.objectInstantiation());
             }
             return Value.NULL;

@@ -16,6 +16,7 @@ public class ClassSymbol {
 
     // store constructor if it is defined
     delphiParser.ConstructorDeclarationContext constructorImpl;
+    delphiParser.DestructorDeclarationContext destructorImpl;
 
     public ClassSymbol(String name) {
         this.name = name;
