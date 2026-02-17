@@ -37,7 +37,36 @@ public class Main {
             if (ctx.type_().structuredType() != null &&
                 ctx.type_().structuredType().unpackedStructuredType() != null &&
                 ctx.type_().structuredType().unpackedStructuredType().classType() != null) {
+                
                 ClassSymbol newClass = new ClassSymbol(name);
+                delphiParser.ClassTypeContext classCtx = ctx.type_().structuredType().unpackedStructuredType().classType();
+
+                if (classCtx.classBody() != null) {
+                    for (delphiParser.ClassSectionContext section : classCtx.classBody().classSection()) {
+                        
+                        boolean isPrivate = false;
+                        if (section.visibilitySpecifier() != null && section.visibilitySpecifier().PRIVATE() != null) {
+                            isPrivate = true;
+                        }
+                        
+                        if (section.classMemberList() != null) {
+                            for (delphiParser.ClassMemberContext member : section.classMemberList().classMember()) {
+                                
+                                if (member.fieldDeclaration() != null) {
+                                    for (delphiParser.IdentifierContext id : member.fieldDeclaration().identifierList().identifier()) {
+                                        if (isPrivate) newClass.privateMembers.add(id.getText().toLowerCase());
+                                    }
+                                }
+                                
+                                if (member.procedureHeader() != null) {
+                                    String procName = member.procedureHeader().identifier().getText();
+                                    if (isPrivate) newClass.privateMembers.add(procName.toLowerCase());
+                                }
+                            }
+                        }
+                    }
+                }
+
                 currentEnv.defineClass(name, newClass);
                 System.out.println("[Interpreter] Defined Class Blueprint: " + name);
             }
@@ -129,6 +158,9 @@ public class Main {
                 currentEnv = new Environment(previous);
                 // inject 'self' into the constructor scope
                 currentEnv.define("self", new Value(newObj)); 
+                
+                mapParameters(blueprint.constructorImpl.formalParameterList(), ctx.parameterList());
+
                 visit(blueprint.constructorImpl.block());
                 currentEnv = previous; 
             }
@@ -159,6 +191,8 @@ public class Main {
 
                 Instance instance = objVal.asInstance();
 
+                checkAccess(instance, methodName);
+
                 // Check for destructor method -- hardcoding not ideal but works
                 if (methodName.equalsIgnoreCase("Destroy")) {
                     if (instance.type.destructorImpl != null) {
@@ -179,6 +213,9 @@ public class Main {
                     currentEnv = new Environment(previous); 
                     // set 'self' 
                     currentEnv.define("self", objVal); 
+
+                    mapParameters(methodCode.formalParameterList(), ctx.parameterList());
+
                     visit(methodCode.block()); 
                     currentEnv = previous;
                 } else {
@@ -190,6 +227,9 @@ public class Main {
                 if (globalProc != null) {
                     Environment previous = currentEnv;
                     currentEnv = new Environment(previous);
+                    
+                    mapParameters(globalProc.formalParameterList(), ctx.parameterList());
+
                     visit(globalProc.block());
                     currentEnv = previous;
                 }
@@ -209,6 +249,13 @@ public class Main {
                 String instanceName = parts[0];
                 String fieldName = parts[1];
                 
+                if (!instanceName.equalsIgnoreCase("self")) {
+                    Value objVal = currentEnv.get(instanceName);
+                    if (objVal.asInstance() != null) {
+                        checkAccess(objVal.asInstance(), fieldName);
+                    }
+                }
+
                 if (instanceName.equalsIgnoreCase("self")) {
                     currentEnv.get("self").asInstance().put(fieldName, val);
                 } else {
@@ -344,7 +391,10 @@ public class Main {
                 if (name.contains(".")) {
                     // explicit field access
                     String[] parts = name.split("\\.");
-                    return currentEnv.get(parts[0]).asInstance().get(parts[1]);
+                    Value val = currentEnv.get(parts[0]).asInstance().get(parts[1]);
+                    
+                    checkAccess(currentEnv.get(parts[0]).asInstance(), parts[1]);
+                    return val;
                 }
                 
                 // implicit lookup 
@@ -361,6 +411,41 @@ public class Main {
                 return visit(ctx.objectInstantiation());
             }
             return Value.NULL;
+        }
+
+        private void mapParameters(delphiParser.FormalParameterListContext definedParams, 
+                                   delphiParser.ParameterListContext passedArgs) {
+            if (definedParams == null) return;
+            if (passedArgs == null) throw new RuntimeException("Argument mismatch: Expected arguments, got none.");
+
+            int argIndex = 0;
+            for (delphiParser.FormalParameterSectionContext section : definedParams.formalParameterSection()) {
+                
+                if (section.parameterGroup() != null) {
+                    for (delphiParser.IdentifierContext id : section.parameterGroup().identifierList().identifier()) {
+                        String paramName = id.getText();
+                        if (argIndex >= passedArgs.actualParameter().size()) {
+                            throw new RuntimeException("Too few arguments passed.");
+                        }
+                        Value argValue = visit(passedArgs.actualParameter(argIndex).expression());
+                        currentEnv.define(paramName, argValue);
+                        argIndex++;
+                    }
+                }
+            }
+        }
+
+        private void checkAccess(Instance targetInstance, String memberName) {
+            if (targetInstance.type.isPrivate(memberName)) {
+                if (!currentEnv.isDefined("self")) {
+                    throw new RuntimeException("Access Denied: '" + memberName + "' is PRIVATE.");
+                }
+                
+                Instance currentSelf = currentEnv.get("self").asInstance();
+                if (!currentSelf.type.name.equals(targetInstance.type.name)) {
+                     throw new RuntimeException("Access Denied: Cannot access private member '" + memberName + "' of " + targetInstance.type.name);
+                }
+            }
         }
 
     }

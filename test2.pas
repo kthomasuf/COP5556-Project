@@ -1,5 +1,3 @@
-{Current interpreter cannot handle parameter passing, need to implement that still, so this code will not do anything meaningful}
-
 PROGRAM TestOOP;
 
 TYPE
@@ -13,6 +11,7 @@ TYPE
       PROCEDURE Heal;    
       PROCEDURE LevelUp; 
       PROCEDURE IncreaseMana(Amount : INTEGER);
+      PROCEDURE ShowStats;
   END;
 
 VAR
@@ -41,8 +40,22 @@ END;
 
 PROCEDURE THero.IncreaseMana(Amount : INTEGER);
 BEGIN
-  WriteLn('Increasing Mana...');
+  WriteLn('Increasing Mana by Amount...');
   Mana := Mana + Amount;
+END;
+
+PROCEDURE THero.ShowStats;
+BEGIN
+  WriteLn('--- Hero Stats ---');
+  WriteLn('Final Health: ');
+  WriteLn(Health);
+  
+  WriteLn('Final Experience: ');
+  WriteLn(Experience);
+  
+  WriteLn('Final Mana: ');
+  WriteLn(Mana);
+  WriteLn('------------------');
 END;
 
 PROCEDURE Random;
@@ -61,14 +74,7 @@ BEGIN
 
   Random();
    
-  WriteLn('Final Health: ');
-  WriteLn(Player.Health);
-
-  WriteLn('Final Experience: ');
-  WriteLn(Player.Experience);
-
-  WriteLn('Final Mana: ');
-  WriteLn(Player.Mana);
+  Player.ShowStats();
 
   WriteLn('Random variable value: ');
   WriteLn(Fizz);
