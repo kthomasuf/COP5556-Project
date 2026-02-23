@@ -189,7 +189,11 @@ unpackedStructuredType
 
 // Moved class parser rules
 classType
-    : CLASS classBody END
+    : CLASS classParent? classBody END
+    ;
+
+classParent
+    : LPAREN identifier RPAREN
     ;
 
 classBody

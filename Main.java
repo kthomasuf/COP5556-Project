@@ -42,6 +42,16 @@ public class Main {
                 ClassSymbol newClass = new ClassSymbol(name);
                 delphiParser.ClassTypeContext classCtx = ctx.type_().structuredType().unpackedStructuredType().classType();
 
+                if (classCtx.classParent() != null) {
+                    String parentName = classCtx.classParent().identifier().getText();
+                    ClassSymbol parent = currentEnv.getClass(parentName);
+                    
+                    if (parent != null) {
+                        newClass.parent = parent;
+                        System.out.println("[Interpreter] Class '" + name + "' inherits from '" + parentName + "'");
+                    }
+                }
+
                 if (classCtx.classBody() != null) {
                     for (delphiParser.ClassSectionContext section : classCtx.classBody().classSection()) {
                         
@@ -139,6 +149,27 @@ public class Main {
             return Value.VOID;
         }
 
+        // inheritance constructor chain helper
+        private void runConstructorChain(ClassSymbol blueprint, Value newObj) {
+            if (blueprint.parent != null) {
+                runConstructorChain(blueprint.parent, newObj);
+            }
+
+            if (blueprint.constructorImpl != null) {
+                System.out.println("[Runtime] Executing Constructor for " + blueprint.name);
+                Environment previous = currentEnv;
+                currentEnv = new Environment(previous);
+                // inject 'self' into the constructor scope
+                currentEnv.define("self", newObj); 
+                
+                // this might cause issues
+                // mapParameters(blueprint.constructorImpl.formalParameterList(), ctx.parameterList());
+
+                visit(blueprint.constructorImpl.block());
+                currentEnv = previous;
+            }
+        }
+
         // execution
 
         // creates new object instance and turns constructor
@@ -152,20 +183,37 @@ public class Main {
             Instance newObj = new Instance(blueprint);
             System.out.println("[Runtime] Allocated memory for: " + className);
 
-            // run constructor if it is defined
-            if (blueprint.constructorImpl != null) {
-                System.out.println("[Runtime] Executing Constructor for " + className);
-                Environment previous = currentEnv;
-                currentEnv = new Environment(previous);
-                // inject 'self' into the constructor scope
-                currentEnv.define("self", new Value(newObj)); 
-                
-                mapParameters(blueprint.constructorImpl.formalParameterList(), ctx.parameterList());
+            runConstructorChain(blueprint, new Value(newObj));
 
-                visit(blueprint.constructorImpl.block());
-                currentEnv = previous; 
-            }
+            // // run constructor if it is defined
+            // if (blueprint.constructorImpl != null) {
+            //     System.out.println("[Runtime] Executing Constructor for " + className);
+            //     Environment previous = currentEnv;
+            //     currentEnv = new Environment(previous);
+            //     // inject 'self' into the constructor scope
+            //     currentEnv.define("self", new Value(newObj)); 
+                
+            //     mapParameters(blueprint.constructorImpl.formalParameterList(), ctx.parameterList());
+
+            //     visit(blueprint.constructorImpl.block());
+            //     currentEnv = previous; 
+            // }
             return new Value(newObj);
+        }
+
+        // locate method code helper function
+        private delphiParser.ProcedureDeclarationContext findMethod(ClassSymbol clazz, String methodName) {
+            // check base (child) class first
+            if (clazz.procedures.containsKey(methodName)) {
+                return clazz.procedures.get(methodName);
+            }
+
+            // check parent class (recursively for extended parental chains)
+            if (clazz.parent != null) {
+                return findMethod(clazz.parent, methodName);
+            }
+
+            return null;
         }
 
         // procedure calls like writeln, methods or normal procedures
@@ -219,8 +267,9 @@ public class Main {
                     return Value.VOID;
                 }
 
-                delphiParser.ProcedureDeclarationContext methodCode = instance.type.procedures.get(methodName.toLowerCase());
-                
+                // delphiParser.ProcedureDeclarationContext methodCode = instance.type.procedures.get(methodName.toLowerCase());
+                delphiParser.ProcedureDeclarationContext methodCode = findMethod(instance.type, methodName.toLowerCase());
+
                 if (methodCode != null) {
                     Environment previous = currentEnv;
                     currentEnv = new Environment(previous); 
@@ -414,6 +463,8 @@ public class Main {
                 if (currentEnv.isDefined(name)) {
                     return currentEnv.get(name);
                 } else if (currentEnv.isDefined("self")) {
+                Instance selfInstance = currentEnv.get("self").asInstance();
+                checkAccess(selfInstance, name);
                     return currentEnv.get("self").asInstance().get(name);
                 } else {
                     throw new RuntimeException("Undefined variable '" + name + "'");

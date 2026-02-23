@@ -9,6 +9,9 @@ public class ClassSymbol {
 
     // class name
     String name;
+    
+    // parent class (if exists)
+    ClassSymbol parent;
 
     // track which members are private
     Set<String> privateMembers = new HashSet<>();
