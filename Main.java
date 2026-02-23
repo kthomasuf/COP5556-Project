@@ -1,6 +1,7 @@
 import org.antlr.v4.runtime.*;
 import my.delphi.*;
 import java.io.IOException;
+import java.util.Scanner;
 
 public class Main {
     
@@ -176,6 +177,18 @@ public class Main {
                  if (ctx.parameterList() != null) {
                      Value val = visit(ctx.parameterList().actualParameter(0).expression());
                      System.out.println(">> OUTPUT: " + val.toString());
+                 }
+                 return Value.VOID;
+            }
+
+            if (callName.equalsIgnoreCase("ReadLn")) {
+                 if (ctx.parameterList() != null) {
+                    String varName = ctx.parameterList().actualParameter(0).expression().getText();
+                    Scanner scanner = new Scanner(System.in);
+                    System.out.println(">> INPUT: ");
+                    // Only handles integers for now
+                    int input = scanner.nextInt();
+                    currentEnv.assign(varName, new Value(input));
                  }
                  return Value.VOID;
             }
