@@ -420,7 +420,6 @@ public class Main {
                 }
             }
             if (ctx.objectInstantiation() != null) {
-                System.out.println("[DEBUG] Recognized as objectInstantiation");
                 return visit(ctx.objectInstantiation());
             }
             return Value.NULL;
