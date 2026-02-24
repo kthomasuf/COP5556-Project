@@ -9,7 +9,7 @@ Our interpreter implementation and grammar additions successfully add functional
 ## Explanation of Implementation
 In order to add the previously listed functionality to the predefined language, several additions were added to the language grammar. Specifically, classes were added as a possible unpackedStructuredType with their accompanying grammar definitions, as well objects were able to be instantiated by adding grammar definitions to the predefined factor definitions. Apart from changes to the grammar we implemented a java interpreter that is able to navigate the abstract syntax tree and provide object oriented programming support that allows classes, objects, etc. to be defined and tested.
 
-## Commands To Run Our Implementation:
+## Commands To Run Our Implementation
 
 ### Generate Lexer and Parser
 
