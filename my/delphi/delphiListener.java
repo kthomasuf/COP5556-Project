@@ -308,6 +308,16 @@ public interface delphiListener extends ParseTreeListener {
 	 */
 	void exitClassType(delphiParser.ClassTypeContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link delphiParser#classParent}.
+	 * @param ctx the parse tree
+	 */
+	void enterClassParent(delphiParser.ClassParentContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link delphiParser#classParent}.
+	 * @param ctx the parse tree
+	 */
+	void exitClassParent(delphiParser.ClassParentContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link delphiParser#classBody}.
 	 * @param ctx the parse tree
 	 */

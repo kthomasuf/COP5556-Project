@@ -11,6 +11,7 @@ public class Environment {
     Map<String, Value> values = new HashMap<>();
     Map<String, ClassSymbol> classes = new HashMap<>(); 
     Map<String, delphiParser.ProcedureDeclarationContext> procedures = new HashMap<>();
+    Map<String, delphiParser.FunctionDeclarationContext> functions = new HashMap<>();
 
     // global environemt
     public Environment() {
@@ -27,6 +28,11 @@ public class Environment {
         if (values.containsKey(name.toLowerCase())) return true;
         if (enclosing != null) return enclosing.isDefined(name);
         return false;
+    }
+
+    // needed to handle function return assignments properly
+    public boolean isDefinedLocal(String name) {
+        return values.containsKey(name.toLowerCase());
     }
 
     // define variable in current scope
@@ -75,6 +81,18 @@ public class Environment {
     public delphiParser.ProcedureDeclarationContext getProcedure(String name) {
         if (procedures.containsKey(name.toLowerCase())) return procedures.get(name.toLowerCase());
         if (enclosing != null) return enclosing.getProcedure(name);
+        return null;
+    }
+
+    // register global function
+    public void defineFunction(String name, delphiParser.FunctionDeclarationContext ctx) {
+        functions.put(name.toLowerCase(), ctx);
+    }
+
+    // get global function body
+    public delphiParser.FunctionDeclarationContext getFunction(String name) {
+        if (functions.containsKey(name.toLowerCase())) return functions.get(name.toLowerCase());
+        if (enclosing != null) return enclosing.getFunction(name);
         return null;
     }
 }

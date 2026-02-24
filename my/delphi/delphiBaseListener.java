@@ -377,6 +377,18 @@ public class delphiBaseListener implements delphiListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterClassParent(delphiParser.ClassParentContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitClassParent(delphiParser.ClassParentContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterClassBody(delphiParser.ClassBodyContext ctx) { }
 	/**
 	 * {@inheritDoc}
