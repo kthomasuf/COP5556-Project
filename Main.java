@@ -497,7 +497,11 @@ public class Main {
                         if (left.isDouble() || right.isDouble()) return new Value(left.asDouble() - right.asDouble());
                         return new Value(left.asInt() - right.asInt());
                     case "OR":
-                        return new Value(left.asBoolean() || right.asBoolean());
+                        if (left.isBoolean() && right.isBoolean()) {
+                            return new Value(left.asBoolean() || right.asBoolean());
+                        } else {
+                            return new Value(left.asInt() | right.asInt()); // Bitwise OR
+                        }
                     default:
                         throw new RuntimeException("Unknown operator: " + operator);
                 }
@@ -525,7 +529,11 @@ public class Main {
                     case "MOD":
                         return new Value(left.asInt() % right.asInt());
                     case "AND":
-                        return new Value(left.asBoolean() && right.asBoolean());
+                        if (left.isBoolean() && right.isBoolean()) {
+                            return new Value(left.asBoolean() && right.asBoolean());
+                        } else {
+                            return new Value(left.asInt() & right.asInt()); // bitwise and
+                        }
                     default:
                         throw new RuntimeException("Unknown operator: " + operator);
                 }
@@ -552,7 +560,11 @@ public class Main {
         public Value visitFactor(delphiParser.FactorContext ctx) {
             if (ctx.bool_() != null) return new Value(ctx.bool_().TRUE() != null); 
             
-            if (ctx.NOT() != null) return new Value(!visit(ctx.factor()).asBoolean()); 
+            if (ctx.NOT() != null) {
+                Value val = visit(ctx.factor());
+                if (val.isBoolean()) return new Value(!val.asBoolean());
+                return new Value(~val.asInt()); //bitwise not for ints
+            }
             
             if (ctx.functionDesignator() != null) return visit(ctx.functionDesignator()); 
 
