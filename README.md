@@ -1,6 +1,6 @@
 # COP5556 - Project #1
 
-### Team Members
+## Team Members
 Shriyans Arkal & Kenneth Thomas
 
 ## What is working?
