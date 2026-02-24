@@ -33,15 +33,15 @@ java -cp .:antlr-4.13.2-complete.jar Main test1.pas
 
 ## Test File Explainations
 
-test1.pas -> Tests Object Oriented Programming Functionality
-test2.pas -> Tests Object Oriented Programming Functionality
-test3.pas -> Tests Arithmetic Logic
-test4.pas -> Tests Comparison Logic
-test5.pas -> Tests Destructor
-test6.pas -> Tests Encapsulation
-test7.pas -> Tests Encapsulation
-test8.pas -> Tests User Input Functionality
-test9.pas -> Tests Inheritance
-test10.pas -> Tests Inheritance w/ Encapsulation
-test11.pas -> Tests All Functionality
-test12.pas -> Tests Object Oriented Programming w/ User Input
+test1.pas -> Tests Object Oriented Programming Functionality  
+test2.pas -> Tests Object Oriented Programming Functionality  
+test3.pas -> Tests Arithmetic Logic  
+test4.pas -> Tests Comparison Logic  
+test5.pas -> Tests Destructor  
+test6.pas -> Tests Encapsulation  
+test7.pas -> Tests Encapsulation  
+test8.pas -> Tests User Input Functionality  
+test9.pas -> Tests Inheritance  
+test10.pas -> Tests Inheritance w/ Encapsulation  
+test11.pas -> Tests All Functionality  
+test12.pas -> Tests Object Oriented Programming w/ User Input  
