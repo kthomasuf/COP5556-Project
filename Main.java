@@ -73,6 +73,11 @@ public class Main {
                                     String procName = member.procedureHeader().identifier().getText();
                                     if (isPrivate) newClass.privateMembers.add(procName.toLowerCase());
                                 }
+
+                                if (member.functionHeader() != null) {
+                                    String funcName = member.functionHeader().identifier().getText();
+                                    if (isPrivate) newClass.privateMembers.add(funcName.toLowerCase());
+                                }
                             }
                         }
                     }
@@ -117,6 +122,25 @@ public class Main {
             return Value.VOID;
         }
 
+        @Override
+        public Value visitFunctionDeclaration(delphiParser.FunctionDeclarationContext ctx) {
+            String fullName = ctx.scopedIdentifier().getText();
+            if (fullName.contains(".")) {
+                String[] parts = fullName.split("\\.");
+                String className = parts[0];
+                String funcName = parts[1];
+                ClassSymbol clazz = currentEnv.getClass(className);
+                if (clazz != null) {
+                    clazz.functions.put(funcName.toLowerCase(), ctx);
+                    System.out.println("[Interpreter] Linked Function '" + funcName + "' to Class '" + className + "'");
+                }
+            } else {
+                currentEnv.defineFunction(fullName, ctx);
+                System.out.println("[Interpreter] Defined Global Function: " + fullName);
+            }
+            return Value.VOID;
+        }
+
         // links constructor to class symbol
         @Override
         public Value visitConstructorDeclaration(delphiParser.ConstructorDeclarationContext ctx) {
@@ -150,22 +174,25 @@ public class Main {
         }
 
         // inheritance constructor chain helper
-        private void runConstructorChain(ClassSymbol blueprint, Value newObj) {
-            if (blueprint.parent != null) {
-                runConstructorChain(blueprint.parent, newObj);
+        private void runConstructorChain(ClassSymbol targetBlueprint, ClassSymbol currentBlueprint, Value newObj, delphiParser.ParameterListContext passedArgs) {
+            if (currentBlueprint.parent != null) {
+                runConstructorChain(targetBlueprint, currentBlueprint.parent, newObj, passedArgs);
             }
 
-            if (blueprint.constructorImpl != null) {
-                System.out.println("[Runtime] Executing Constructor for " + blueprint.name);
+            if (currentBlueprint.constructorImpl != null) {
+                System.out.println("[Runtime] Executing Constructor for " + currentBlueprint.name);
                 Environment previous = currentEnv;
                 currentEnv = new Environment(previous);
                 // inject 'self' into the constructor scope
                 currentEnv.define("self", newObj); 
                 
-                // this might cause issues
-                // mapParameters(blueprint.constructorImpl.formalParameterList(), ctx.parameterList());
+                if (currentBlueprint == targetBlueprint) {
+                    mapParameters(currentBlueprint.constructorImpl.formalParameterList(), passedArgs);
+                } else {
+                    mapParameters(currentBlueprint.constructorImpl.formalParameterList(), null);
+                }
 
-                visit(blueprint.constructorImpl.block());
+                visit(currentBlueprint.constructorImpl.block());
                 currentEnv = previous;
             }
         }
@@ -175,30 +202,45 @@ public class Main {
         // creates new object instance and turns constructor
         @Override
         public Value visitObjectInstantiation(delphiParser.ObjectInstantiationContext ctx) {
-            String className = ctx.identifier(0).getText();
-            ClassSymbol blueprint = currentEnv.getClass(className);
-            if (blueprint == null) throw new RuntimeException("Unknown class: " + className);
+            String leftName = ctx.identifier(0).getText();
+            String rightName = ctx.identifier(1).getText();
 
-            // create the instance 
-            Instance newObj = new Instance(blueprint);
-            System.out.println("[Runtime] Allocated memory for: " + className);
-
-            runConstructorChain(blueprint, new Value(newObj));
-
-            // // run constructor if it is defined
-            // if (blueprint.constructorImpl != null) {
-            //     System.out.println("[Runtime] Executing Constructor for " + className);
-            //     Environment previous = currentEnv;
-            //     currentEnv = new Environment(previous);
-            //     // inject 'self' into the constructor scope
-            //     currentEnv.define("self", new Value(newObj)); 
+            // check class instatiation first 
+            ClassSymbol blueprint = currentEnv.getClass(leftName);
+            if (blueprint != null) {
+                Instance newObj = new Instance(blueprint);
+                System.out.println("[Runtime] Allocated memory for: " + leftName);
                 
-            //     mapParameters(blueprint.constructorImpl.formalParameterList(), ctx.parameterList());
+                runConstructorChain(blueprint, blueprint, new Value(newObj), ctx.parameterList());
+                return new Value(newObj);
+            }
 
-            //     visit(blueprint.constructorImpl.block());
-            //     currentEnv = previous; 
-            // }
-            return new Value(newObj);
+            // method function if not class 
+            if (currentEnv.isDefined(leftName)) {
+                Value objVal = currentEnv.get(leftName);
+                if (objVal.isInstance()) {
+                    checkAccess(objVal.asInstance(), rightName);
+
+                    delphiParser.FunctionDeclarationContext methodFunc = findFunction(objVal.asInstance().type, rightName);
+                    if (methodFunc != null) {
+                        Environment previous = currentEnv;
+                        currentEnv = new Environment(previous);
+                        currentEnv.define("self", objVal);
+                        currentEnv.define(rightName, new Value(0));
+                        
+                        mapParameters(methodFunc.formalParameterList(), ctx.parameterList());
+                        visit(methodFunc.block());
+                        
+                        Value res = currentEnv.get(rightName);
+                        currentEnv = previous;
+                        return res;
+                    } else {
+                        throw new RuntimeException("Method '" + rightName + "' not found in object '" + leftName + "'");
+                    }
+                }
+            }
+
+            throw new RuntimeException("Unknown class or object: " + leftName);
         }
 
         // locate method code helper function
@@ -213,6 +255,16 @@ public class Main {
                 return findMethod(clazz.parent, methodName);
             }
 
+            return null;
+        }
+
+        private delphiParser.FunctionDeclarationContext findFunction(ClassSymbol clazz, String funcName) {
+            if (clazz.functions.containsKey(funcName.toLowerCase())) {
+                return clazz.functions.get(funcName.toLowerCase());
+            }
+            if (clazz.parent != null) {
+                return findFunction(clazz.parent, funcName);
+            }
             return null;
         }
 
@@ -267,7 +319,6 @@ public class Main {
                     return Value.VOID;
                 }
 
-                // delphiParser.ProcedureDeclarationContext methodCode = instance.type.procedures.get(methodName.toLowerCase());
                 delphiParser.ProcedureDeclarationContext methodCode = findMethod(instance.type, methodName.toLowerCase());
 
                 if (methodCode != null) {
@@ -284,7 +335,24 @@ public class Main {
                     throw new RuntimeException("Method " + methodName + " not found");
                 }
             } else {
-                // normal global procdure call
+                // calling private method from within the class 
+                if (currentEnv.isDefined("self")) {
+                    Value selfVal = currentEnv.get("self");
+                    if (selfVal.isInstance()) {
+                        delphiParser.ProcedureDeclarationContext methodCode = findMethod(selfVal.asInstance().type, callName.toLowerCase());
+                        if (methodCode != null) {
+                            Environment previous = currentEnv;
+                            currentEnv = new Environment(previous);
+                            currentEnv.define("self", selfVal);
+                            mapParameters(methodCode.formalParameterList(), ctx.parameterList());
+                            visit(methodCode.block());
+                            currentEnv = previous;
+                            return Value.VOID;
+                        }
+                    }
+                }
+
+                // normal global procedure call
                 delphiParser.ProcedureDeclarationContext globalProc = currentEnv.getProcedure(callName);
                 if (globalProc != null) {
                     Environment previous = currentEnv;
@@ -294,9 +362,33 @@ public class Main {
 
                     visit(globalProc.block());
                     currentEnv = previous;
+                } else {
+                    // stop silently failing lol
+                    throw new RuntimeException("Procedure '" + callName + "' not found");
                 }
             }
             return Value.VOID;
+        }
+
+        @Override
+        public Value visitFunctionDesignator(delphiParser.FunctionDesignatorContext ctx) {
+            String funcName = ctx.identifier().getText();
+            delphiParser.FunctionDeclarationContext globalFunc = currentEnv.getFunction(funcName);
+            
+            if (globalFunc != null) {
+                Environment previous = currentEnv;
+                currentEnv = new Environment(previous);
+                
+                currentEnv.define(funcName, new Value(0));
+                
+                mapParameters(globalFunc.formalParameterList(), ctx.parameterList());
+                visit(globalFunc.block());
+                
+                Value result = currentEnv.get(funcName);
+                currentEnv = previous;
+                return result;
+            }
+            throw new RuntimeException("Function " + funcName + " not found");
         }
 
         // variable assignment, explicit and implicit 
@@ -351,26 +443,36 @@ public class Main {
 
             if (ctx.relationaloperator() != null) {
                 Value right = visit(ctx.expression());
-                String operator = ctx.relationaloperator().getText();
+                String operator = ctx.relationaloperator().getText().toUpperCase();
 
-                switch (operator.toUpperCase()) {
-                    case "=":
-                        return new Value((left.asInt() == right.asInt()) ? 1 : 0);
-                    case "<>":
-                        return new Value((left.asInt() != right.asInt()) ? 1 : 0);
-                    case "<":
-                        return new Value((left.asInt() < right.asInt()) ? 1 : 0);
-                    case "<=":
-                        return new Value((left.asInt() <= right.asInt()) ? 1 : 0);
-                    case ">":
-                        return new Value((left.asInt() > right.asInt()) ? 1 : 0);
-                    case ">=":
-                        return new Value((left.asInt() >= right.asInt()) ? 1 : 0);
-                    case "IN":
-                        // Requires set support
-                        throw new RuntimeException("IN operator not yet implemented");
-                    default:
-                        throw new RuntimeException("Unknown operator: " + operator);
+                if (left.isString() || right.isString()) {
+                    int cmp = left.asString().compareTo(right.asString());
+                    switch (operator) {
+                        case "=": return new Value(cmp == 0);
+                        case "<>": return new Value(cmp != 0);
+                        default: throw new RuntimeException("Operator " + operator + " unsupported for Strings");
+                    }
+                }
+
+                if (left.isBoolean() || right.isBoolean()) {
+                    boolean l = left.asBoolean(), r = right.asBoolean();
+                    switch (operator) {
+                        case "=": return new Value(l == r);
+                        case "<>": return new Value(l != r);
+                        default: throw new RuntimeException("Unsupported operator for Boolean");
+                    }
+                }
+
+                double l = left.asDouble();
+                double r = right.asDouble();
+                switch (operator) {
+                    case "=": return new Value(l == r);
+                    case "<>": return new Value(l != r);
+                    case "<": return new Value(l < r);
+                    case "<=": return new Value(l <= r);
+                    case ">": return new Value(l > r);
+                    case ">=": return new Value(l >= r);
+                    default: throw new RuntimeException("Unknown operator: " + operator);
                 }
             }
 
@@ -384,15 +486,18 @@ public class Main {
 
             if (ctx.additiveoperator() != null) {
                 Value right = visit(ctx.simpleExpression());
-                String operator = ctx.additiveoperator().getText();
+                String operator = ctx.additiveoperator().getText().toUpperCase();
 
-                switch (operator.toUpperCase()) {
+                switch (operator) {
                     case "+":
+                        if (left.isString() || right.isString()) return new Value(left.asString() + right.asString());
+                        if (left.isDouble() || right.isDouble()) return new Value(left.asDouble() + right.asDouble());
                         return new Value(left.asInt() + right.asInt());
                     case "-":
+                        if (left.isDouble() || right.isDouble()) return new Value(left.asDouble() - right.asDouble());
                         return new Value(left.asInt() - right.asInt());
                     case "OR":
-                        return new Value((left.asInt() != 0 || right.asInt() != 0) ? 1 : 0);
+                        return new Value(left.asBoolean() || right.asBoolean());
                     default:
                         throw new RuntimeException("Unknown operator: " + operator);
                 }
@@ -407,19 +512,20 @@ public class Main {
 
             if (ctx.multiplicativeoperator() != null) {
                 Value right = visit(ctx.term());
-                String operator = ctx.multiplicativeoperator().getText();
+                String operator = ctx.multiplicativeoperator().getText().toUpperCase();
 
-                switch (operator.toUpperCase()) {
+                switch (operator) {
                     case "*":
+                        if (left.isDouble() || right.isDouble()) return new Value(left.asDouble() * right.asDouble());
                         return new Value(left.asInt() * right.asInt());
                     case "/":
-                        return new Value(left.asInt() / right.asInt());
+                        return new Value(left.asDouble() / right.asDouble());
                     case "DIV":
                         return new Value(left.asInt() / right.asInt());
                     case "MOD":
                         return new Value(left.asInt() % right.asInt());
                     case "AND":
-                        return new Value((left.asInt() != 0 && right.asInt() != 0) ? 1 : 0);
+                        return new Value(left.asBoolean() && right.asBoolean());
                     default:
                         throw new RuntimeException("Unknown operator: " + operator);
                 }
@@ -434,6 +540,7 @@ public class Main {
             Value val = visit(ctx.factor());
 
             if (ctx.MINUS() != null) {
+                if (val.isDouble()) return new Value(-val.asDouble());
                 return new Value(-val.asInt());
             }
 
@@ -443,28 +550,68 @@ public class Main {
         // reading values
         @Override
         public Value visitFactor(delphiParser.FactorContext ctx) {
+            if (ctx.bool_() != null) return new Value(ctx.bool_().TRUE() != null); 
+            
+            if (ctx.NOT() != null) return new Value(!visit(ctx.factor()).asBoolean()); 
+            
+            if (ctx.functionDesignator() != null) return visit(ctx.functionDesignator()); 
+
+            if (ctx.LPAREN() != null) return visit(ctx.expression());
+
             if (ctx.unsignedConstant() != null) {
                 String text = ctx.unsignedConstant().getText();
                 if (text.startsWith("'")) return new Value(text.replace("'", "")); 
+                if (text.contains(".") || text.toLowerCase().contains("e")) {
+                    return new Value(Double.parseDouble(text)); 
+                }
                 return new Value(Integer.parseInt(text));        
             }
+
             if (ctx.variable() != null) {
                 String name = ctx.variable().getText();
-                if (name.contains(".")) {
-                    // explicit field access
+
+                if (!name.contains(".")) {
+                    delphiParser.FunctionDeclarationContext func = currentEnv.getFunction(name);
+                    if (func != null && !currentEnv.isDefinedLocal(name)) {
+                        Environment previous = currentEnv;
+                        currentEnv = new Environment(previous);
+                        currentEnv.define(name, new Value(0));
+                        visit(func.block());
+                        Value res = currentEnv.get(name);
+                        currentEnv = previous;
+                        return res;
+                    }
+                } else {
                     String[] parts = name.split("\\.");
-                    Value val = currentEnv.get(parts[0]).asInstance().get(parts[1]);
-                    
+                    if (currentEnv.isDefined(parts[0])) {
+                        Value objVal = currentEnv.get(parts[0]);
+                        if (objVal.isInstance()) {
+                            delphiParser.FunctionDeclarationContext methodFunc = findFunction(objVal.asInstance().type, parts[1]);
+                            if (methodFunc != null && !currentEnv.isDefinedLocal(parts[1])) {
+                                Environment previous = currentEnv;
+                                currentEnv = new Environment(previous);
+                                currentEnv.define("self", objVal);
+                                currentEnv.define(parts[1], new Value(0));
+                                visit(methodFunc.block());
+                                Value res = currentEnv.get(parts[1]);
+                                currentEnv = previous;
+                                return res;
+                            }
+                        }
+                    }
+                }
+
+                if (name.contains(".")) {
+                    String[] parts = name.split("\\.");
                     checkAccess(currentEnv.get(parts[0]).asInstance(), parts[1]);
-                    return val;
+                    return currentEnv.get(parts[0]).asInstance().get(parts[1]);
                 }
                 
-                // implicit lookup 
                 if (currentEnv.isDefined(name)) {
                     return currentEnv.get(name);
                 } else if (currentEnv.isDefined("self")) {
-                Instance selfInstance = currentEnv.get("self").asInstance();
-                checkAccess(selfInstance, name);
+                    Instance selfInstance = currentEnv.get("self").asInstance();
+                    checkAccess(selfInstance, name);
                     return currentEnv.get("self").asInstance().get(name);
                 } else {
                     throw new RuntimeException("Undefined variable '" + name + "'");
@@ -480,7 +627,8 @@ public class Main {
         private void mapParameters(delphiParser.FormalParameterListContext definedParams, 
                                    delphiParser.ParameterListContext passedArgs) {
             if (definedParams == null) return;
-            if (passedArgs == null) throw new RuntimeException("Argument mismatch: Expected arguments, got none.");
+            
+            boolean fillDefaults = (passedArgs == null);
 
             int argIndex = 0;
             for (delphiParser.FormalParameterSectionContext section : definedParams.formalParameterSection()) {
@@ -488,10 +636,11 @@ public class Main {
                 if (section.parameterGroup() != null) {
                     for (delphiParser.IdentifierContext id : section.parameterGroup().identifierList().identifier()) {
                         String paramName = id.getText();
-                        if (argIndex >= passedArgs.actualParameter().size()) {
+                        if (!fillDefaults && argIndex >= passedArgs.actualParameter().size()) {
                             throw new RuntimeException("Too few arguments passed.");
                         }
-                        Value argValue = visit(passedArgs.actualParameter(argIndex).expression());
+                        
+                        Value argValue = fillDefaults ? new Value(0) : visit(passedArgs.actualParameter(argIndex).expression());
                         currentEnv.define(paramName, argValue);
                         argIndex++;
                     }

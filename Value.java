@@ -12,9 +12,36 @@ public class Value {
         this.value = value;
     }
 
-    // assume data is is integer but may crash with other data
+    public boolean isInt() {
+        return value instanceof Integer;
+    }
+
+    public boolean isDouble() {
+        return value instanceof Double;
+    }
+
+    public boolean isString() {
+        return value instanceof String;
+    }
+
+    public boolean isBoolean() {
+        return value instanceof Boolean;
+    }
+
+    public boolean isInstance() {
+        return value instanceof Instance;
+    }
+
+    // 
     public Integer asInt() {
         return (Integer) value;
+    }
+
+    public Double asDouble() {
+        if (isInt()) {
+            return ((Integer) value).doubleValue();
+        }
+        return (Double) value;
     }
 
     // string rep for pascal
@@ -22,9 +49,13 @@ public class Value {
         return String.valueOf(value);
     }
 
+    public Boolean asBoolean() {
+        return (Boolean) value;
+    }
+
     // if this value is an instance
     public Instance asInstance() {
-        if (value instanceof Instance) {
+        if (isInstance()) {
             return (Instance) value;
         }
         return null;
