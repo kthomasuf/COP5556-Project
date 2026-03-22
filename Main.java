@@ -436,6 +436,40 @@ public class Main {
             return Value.VOID;
         }
 
+        // iterate through each statement in a statement list
+        @Override
+        public Value visitStatements(delphiParser.StatementsContext ctx) {
+            Value result = Value.VOID;
+            for (delphiParser.StatementContext stmt : ctx.statement()) {
+                result = visit(stmt);
+            }
+            return result;
+        }
+
+        // if-then-else branching
+        @Override
+        public Value visitIfStatement(delphiParser.IfStatementContext ctx) {
+            Value condition = visit(ctx.expression());
+            boolean isTrue;
+
+            if (condition.isBoolean()) {
+                isTrue = condition.asBoolean();
+            } else if (condition.isInt()) {
+                isTrue = condition.asInt() != 0;
+            } else if (condition.isDouble()) {
+                isTrue = condition.asDouble() != 0.0;
+            } else {
+                isTrue = false;
+            }
+
+            if (isTrue) {
+                visit(ctx.statement(0)); // then branch
+            } else if (ctx.ELSE() != null) {
+                visit(ctx.statement(1)); // else branch
+            }
+            return Value.VOID;
+        }
+
         // relational operator support
         @Override
         public Value visitExpression(delphiParser.ExpressionContext ctx) {
