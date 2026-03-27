@@ -470,6 +470,52 @@ public class Main {
             return Value.VOID;
         }
 
+        // while-do loop
+        @Override
+        public Value visitWhileStatement(delphiParser.WhileStatementContext ctx) {
+            while (true) {
+                Value condition = visit(ctx.expression());
+                boolean isTrue;
+
+                if (condition.isBoolean()) {
+                    isTrue = condition.asBoolean();
+                } else if (condition.isInt()) {
+                    isTrue = condition.asInt() != 0;
+                } else {
+                    isTrue = false;
+                }
+
+                if (!isTrue) break;
+                visit(ctx.statement());
+            }
+            return Value.VOID;
+        }
+
+        // for-do loop
+        @Override
+        public Value visitForStatement(delphiParser.ForStatementContext ctx) {
+            String varName = ctx.identifier().getText();
+            Value startVal = visit(ctx.forList().initialValue().expression());
+            Value endVal = visit(ctx.forList().finalValue().expression());
+            boolean isTo = ctx.forList().TO() != null;
+
+            int start = startVal.asInt();
+            int end = endVal.asInt();
+
+            if (isTo) {
+                for (int i = start; i <= end; i++) {
+                    currentEnv.assign(varName, new Value(i));
+                    visit(ctx.statement());
+                }
+            } else {
+                for (int i = start; i >= end; i--) {
+                    currentEnv.assign(varName, new Value(i));
+                    visit(ctx.statement());
+                }
+            }
+            return Value.VOID;
+        }
+
         // relational operator support
         @Override
         public Value visitExpression(delphiParser.ExpressionContext ctx) {
