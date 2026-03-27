@@ -386,6 +386,17 @@ simpleStatement
     | assignmentStatement
     | gotoStatement
     | emptyStatement_
+    | breakStatement
+    | continueStatement
+    ;
+
+// Break and Continue statements
+breakStatement
+    : BREAK
+    ;
+
+continueStatement
+    : CONTINUE
     ;
 
 assignmentStatement
@@ -906,6 +917,15 @@ DESTRUCTOR
 // Class Implementation
 CLASS
     : 'CLASS'
+    ;
+
+// Break and Continue Keywords
+BREAK
+    : 'BREAK'
+    ;
+
+CONTINUE
+    : 'CONTINUE'
     ;
 
 IDENT

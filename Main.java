@@ -28,6 +28,17 @@ public class Main {
             return visit(ctx.compoundStatement());
         }
 
+        // exceptions
+        @Override 
+        public Value visitBreakStatement(delphiParser.BreakStatementContext ctx) {
+            throw new BreakException();
+        }
+
+        @Override
+        public Value visitContinueStatement(delphiParser.ContinueStatementContext ctx) {
+            throw new ContinueException();
+        }
+
         // definitions
 
         // registers a new class in the environment
@@ -473,21 +484,28 @@ public class Main {
         // while-do loop
         @Override
         public Value visitWhileStatement(delphiParser.WhileStatementContext ctx) {
-            while (true) {
-                Value condition = visit(ctx.expression());
-                boolean isTrue;
+            try {
+                while (true) {
+                    Value condition = visit(ctx.expression());
+                    boolean isTrue;
 
-                if (condition.isBoolean()) {
-                    isTrue = condition.asBoolean();
-                } else if (condition.isInt()) {
-                    isTrue = condition.asInt() != 0;
-                } else {
-                    isTrue = false;
+                    if (condition.isBoolean()) {
+                        isTrue = condition.asBoolean();
+                    } else if (condition.isInt()) {
+                        isTrue = condition.asInt() != 0;
+                    } else {
+                        isTrue = false;
+                    }
+
+                    if (!isTrue) break;
+                    
+                    try {
+                        visit(ctx.statement());
+                    } catch (ContinueException e) {
+                        continue;
+                    }
                 }
-
-                if (!isTrue) break;
-                visit(ctx.statement());
-            }
+            } catch (BreakException e) {}
             return Value.VOID;
         }
 
@@ -502,17 +520,31 @@ public class Main {
             int start = startVal.asInt();
             int end = endVal.asInt();
 
-            if (isTo) {
-                for (int i = start; i <= end; i++) {
-                    currentEnv.assign(varName, new Value(i));
-                    visit(ctx.statement());
+            try {
+                if (isTo) {
+                    for (int i = start; i <= end; i++) {
+                        currentEnv.assign(varName, new Value(i));
+                        // visit(ctx.statement());
+                        try {
+                            visit(ctx.statement());
+                        } catch (ContinueException e) {
+                            // Continue to next iteration
+                            continue;
+                        }
+                    }
+                } else {
+                    for (int i = start; i >= end; i--) {
+                        currentEnv.assign(varName, new Value(i));
+                        //visit(ctx.statement());
+                        try {
+                            visit(ctx.statement());
+                        } catch (ContinueException e) {
+                            // Continue to next iteration
+                            continue;
+                        }
+                    }
                 }
-            } else {
-                for (int i = start; i >= end; i--) {
-                    currentEnv.assign(varName, new Value(i));
-                    visit(ctx.statement());
-                }
-            }
+            } catch (BreakException e) {}
             return Value.VOID;
         }
 
