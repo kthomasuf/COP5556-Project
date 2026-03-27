@@ -20,8 +20,10 @@ public class ClassSymbol {
     Map<String, String> fields = new HashMap<>(); 
     
     // store procedures and functions
-    Map<String, delphiParser.ProcedureDeclarationContext> procedures = new HashMap<>();
+    // Map<String, delphiParser.ProcedureDeclarationContext> procedures = new HashMap<>();
+    Map<String, ProcedureSymbol> procedures = new HashMap<>();
     Map<String, delphiParser.FunctionDeclarationContext> functions = new HashMap<>();
+    // Map<String, FunctionSymbol> functions = new HashMap<>();
 
     // store constructor if it is defined
     delphiParser.ConstructorDeclarationContext constructorImpl;

@@ -20,7 +20,7 @@ java -jar antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.delphi 
 ### Compile Interpreter Code
 
 ```bash
-javac -cp .:antlr-4.13.2-complete.jar Main.java Value.java Instance.java Environment.java ClassSymbol.java my/delphi/*.java
+javac -cp .:antlr-4.13.2-complete.jar Main.java Value.java Instance.java Environment.java ClassSymbol.java BreakException.java ContinueException.java ProcedureSymbol.java FunctionSymbol.java my/delphi/*.java
 ```
 
 ### Run The Interpreter

@@ -122,12 +122,14 @@ public class Main {
                 String methodName = parts[1];
                 ClassSymbol clazz = currentEnv.getClass(className);
                 if (clazz != null) {
-                    clazz.procedures.put(methodName.toLowerCase(), ctx);
+                    ProcedureSymbol procSymbol = new ProcedureSymbol(ctx, currentEnv);
+                    clazz.procedures.put(methodName.toLowerCase(), procSymbol);
                     System.out.println("[Interpreter] Linked Method '" + methodName + "' to Class '" + className + "'");
                 }
             } else {
                 // normal global procedure
-                currentEnv.defineProcedure(fullName, ctx);
+                ProcedureSymbol procSymbol = new ProcedureSymbol(ctx, currentEnv);
+                currentEnv.defineProcedure(fullName, procSymbol);
                 System.out.println("[Interpreter] Defined Global Procedure: " + fullName);
             }
             return Value.VOID;
@@ -255,7 +257,7 @@ public class Main {
         }
 
         // locate method code helper function
-        private delphiParser.ProcedureDeclarationContext findMethod(ClassSymbol clazz, String methodName) {
+        private ProcedureSymbol findMethod(ClassSymbol clazz, String methodName) {
             // check base (child) class first
             if (clazz.procedures.containsKey(methodName)) {
                 return clazz.procedures.get(methodName);
@@ -283,7 +285,8 @@ public class Main {
         @Override
         public Value visitProcedureStatement(delphiParser.ProcedureStatementContext ctx) {
             String callName = ctx.variable().getText();
-            
+            ProcedureSymbol procSymbol = currentEnv.getProcedure(callName);
+
             if (callName.equalsIgnoreCase("WriteLn")) {
                  if (ctx.parameterList() != null) {
                      Value val = visit(ctx.parameterList().actualParameter(0).expression());
@@ -322,7 +325,8 @@ public class Main {
                     if (instance.type.destructorImpl != null) {
                         System.out.println("[Runtime] Executing Destructor");
                         Environment previous = currentEnv;
-                        currentEnv = new Environment(previous);
+                        currentEnv = new Environment(procSymbol.definitionEnv);
+                        // currentEnv = new Environment(previous);
                         currentEnv.define("self", objVal);
                         visit(instance.type.destructorImpl.block());
                         currentEnv = previous;
@@ -330,17 +334,18 @@ public class Main {
                     return Value.VOID;
                 }
 
-                delphiParser.ProcedureDeclarationContext methodCode = findMethod(instance.type, methodName.toLowerCase());
+                ProcedureSymbol methodCode = findMethod(instance.type, methodName.toLowerCase());
 
-                if (methodCode != null) {
+                if (methodCode.ctx != null) {
                     Environment previous = currentEnv;
-                    currentEnv = new Environment(previous); 
+                    currentEnv = new Environment(methodCode.definitionEnv);
+                    // currentEnv = new Environment(previous); 
                     // set 'self' 
                     currentEnv.define("self", objVal); 
 
-                    mapParameters(methodCode.formalParameterList(), ctx.parameterList());
+                    mapParameters(methodCode.ctx.formalParameterList(), ctx.parameterList());
 
-                    visit(methodCode.block()); 
+                    visit(methodCode.ctx.block()); 
                     currentEnv = previous;
                 } else {
                     throw new RuntimeException("Method " + methodName + " not found");
@@ -350,13 +355,14 @@ public class Main {
                 if (currentEnv.isDefined("self")) {
                     Value selfVal = currentEnv.get("self");
                     if (selfVal.isInstance()) {
-                        delphiParser.ProcedureDeclarationContext methodCode = findMethod(selfVal.asInstance().type, callName.toLowerCase());
-                        if (methodCode != null) {
+                        ProcedureSymbol methodCode = findMethod(selfVal.asInstance().type, callName.toLowerCase());
+                        if (methodCode.ctx != null) {
                             Environment previous = currentEnv;
-                            currentEnv = new Environment(previous);
+                            currentEnv = new Environment(methodCode.definitionEnv);
+                            // currentEnv = new Environment(previous);
                             currentEnv.define("self", selfVal);
-                            mapParameters(methodCode.formalParameterList(), ctx.parameterList());
-                            visit(methodCode.block());
+                            mapParameters(methodCode.ctx.formalParameterList(), ctx.parameterList());
+                            visit(methodCode.ctx.block());
                             currentEnv = previous;
                             return Value.VOID;
                         }
@@ -364,14 +370,16 @@ public class Main {
                 }
 
                 // normal global procedure call
-                delphiParser.ProcedureDeclarationContext globalProc = currentEnv.getProcedure(callName);
-                if (globalProc != null) {
+                // delphiParser.ProcedureDeclarationContext globalProc = currentEnv.getProcedure(callName).ctx;
+                ProcedureSymbol globalProc = currentEnv.getProcedure(callName);
+                if (globalProc.ctx != null) {
                     Environment previous = currentEnv;
-                    currentEnv = new Environment(previous);
+                    currentEnv = new Environment(globalProc.definitionEnv);
+                    // currentEnv = new Environment(previous);
                     
-                    mapParameters(globalProc.formalParameterList(), ctx.parameterList());
+                    mapParameters(globalProc.ctx.formalParameterList(), ctx.parameterList());
 
-                    visit(globalProc.block());
+                    visit(globalProc.ctx.block());
                     currentEnv = previous;
                 } else {
                     // stop silently failing lol
@@ -484,6 +492,9 @@ public class Main {
         // while-do loop
         @Override
         public Value visitWhileStatement(delphiParser.WhileStatementContext ctx) {
+            Environment previous = currentEnv;
+            currentEnv = new Environment(previous);
+
             try {
                 while (true) {
                     Value condition = visit(ctx.expression());
@@ -505,7 +516,11 @@ public class Main {
                         continue;
                     }
                 }
-            } catch (BreakException e) {}
+            } catch (BreakException e) {
+
+            } finally {
+                currentEnv = previous;
+            }
             return Value.VOID;
         }
 
@@ -519,6 +534,10 @@ public class Main {
 
             int start = startVal.asInt();
             int end = endVal.asInt();
+
+            Environment previous = currentEnv;
+            currentEnv = new Environment(previous);
+            currentEnv.define(varName, new Value(start));
 
             try {
                 if (isTo) {
@@ -544,7 +563,11 @@ public class Main {
                         }
                     }
                 }
-            } catch (BreakException e) {}
+            } catch (BreakException e) {
+
+            } finally {
+                currentEnv = previous;
+            }
             return Value.VOID;
         }
 
