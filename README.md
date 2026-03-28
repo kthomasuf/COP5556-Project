@@ -1,8 +1,8 @@
 # COP5556 - Project #2
 
 ## Team Members
-Shriyans Arkal (UFID: 52069214)
-Kenneth Thomas (UFID: 47801757)
+Shriyans Arkal (UFID: 52069214)  
+Kenneth Thomas (UFID: 47801757)  
 
 ## What is working?
 For the first project milestone, our interpreter implementation and grammar additions successfully add functionality for classes, objects, constructors, destructors, and encapsulation to the predefined language. Class inheritance and related functionality was also implemented. 
@@ -52,12 +52,12 @@ test9.pas -> Tests Inheritance
 test10.pas -> Tests Inheritance w/ Encapsulation  
 test11.pas -> Tests All Functionality  
 test12.pas -> Tests Object Oriented Programming w/ User Input  
-test13.pas -> Tests If-Else statements
-test14.pas -> Tests While Loop
-test15.pas -> Tests For Loop
-test16.pas -> Tests Break Keyword in For Loop
-test17.pas -> Tests Continue Keyword in For Loop
-test18.pas -> Tests Break Keyword in While Loop
-test19.pas -> Tests Continue Keyword in While Loop
-test20.pas -> Tests Static Scoping for Procedures
-test21.pas -> Tests Static Scoping for Functions
+test13.pas -> Tests If-Else statements  
+test14.pas -> Tests While Loop  
+test15.pas -> Tests For Loop  
+test16.pas -> Tests Break Keyword in For Loop  
+test17.pas -> Tests Continue Keyword in For Loop  
+test18.pas -> Tests Break Keyword in While Loop  
+test19.pas -> Tests Continue Keyword in While Loop  
+test20.pas -> Tests Static Scoping for Procedures  
+test21.pas -> Tests Static Scoping for Functions  
