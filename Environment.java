@@ -12,8 +12,8 @@ public class Environment {
     Map<String, ClassSymbol> classes = new HashMap<>();
     // Map<String, delphiParser.ProcedureDeclarationContext> procedures = new HashMap<>();
     Map<String, ProcedureSymbol> procedures = new HashMap<>();
-    Map<String, delphiParser.FunctionDeclarationContext> functions = new HashMap<>();
-    // Map<String, FunctionSymbol> functions = new HashMap<>();
+    //Map<String, delphiParser.FunctionDeclarationContext> functions = new HashMap<>();
+    Map<String, FunctionSymbol> functions = new HashMap<>();
 
     // global environemt
     public Environment() {
@@ -95,22 +95,22 @@ public class Environment {
     }
 
     // register global function
-    public void defineFunction(String name, delphiParser.FunctionDeclarationContext ctx) {
-        functions.put(name.toLowerCase(), ctx);
-    }
-    // public void defineFunction(String name, FunctionSymbol symbol) {
-    //     functions.put(name.toLowerCase(), symbol);
+    // public void defineFunction(String name, delphiParser.FunctionDeclarationContext ctx) {
+    //     functions.put(name.toLowerCase(), ctx);
     // }
+    public void defineFunction(String name, FunctionSymbol symbol) {
+        functions.put(name.toLowerCase(), symbol);
+    }
 
     // get global function body
-    public delphiParser.FunctionDeclarationContext getFunction(String name) {
-        if (functions.containsKey(name.toLowerCase())) return functions.get(name.toLowerCase());
-        if (enclosing != null) return enclosing.getFunction(name);
-        return null;
-    }
-    // public FunctionSymbol getFunction(String name) {
+    // public delphiParser.FunctionDeclarationContext getFunction(String name) {
     //     if (functions.containsKey(name.toLowerCase())) return functions.get(name.toLowerCase());
     //     if (enclosing != null) return enclosing.getFunction(name);
     //     return null;
     // }
+    public FunctionSymbol getFunction(String name) {
+        if (functions.containsKey(name.toLowerCase())) return functions.get(name.toLowerCase());
+        if (enclosing != null) return enclosing.getFunction(name);
+        return null;
+    }
 }

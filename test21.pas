@@ -1,21 +1,19 @@
 PROGRAM FunctionStaticScopeTest;
 VAR x: INTEGER;
 
-FUNCTION f: INTEGER;
+FUNCTION a: INTEGER;
 BEGIN
-  f := x;
+  a := x;
 END;
 
-FUNCTION g: INTEGER;
+FUNCTION b: INTEGER;
 VAR x: INTEGER;
 BEGIN
   x := 20;
-  g := f;
+  b := a;
 END;
 
 BEGIN
   x := 10;
-  WriteLn(g);
+  WriteLn(b);
 END.
-
-{Should print 10 not 20}

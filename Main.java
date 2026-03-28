@@ -144,11 +144,13 @@ public class Main {
                 String funcName = parts[1];
                 ClassSymbol clazz = currentEnv.getClass(className);
                 if (clazz != null) {
-                    clazz.functions.put(funcName.toLowerCase(), ctx);
+                    FunctionSymbol funcSymbol = new FunctionSymbol(ctx, currentEnv);
+                    clazz.functions.put(funcName.toLowerCase(), funcSymbol);
                     System.out.println("[Interpreter] Linked Function '" + funcName + "' to Class '" + className + "'");
                 }
             } else {
-                currentEnv.defineFunction(fullName, ctx);
+                FunctionSymbol funcSymbol = new FunctionSymbol(ctx, currentEnv);
+                currentEnv.defineFunction(fullName, funcSymbol);
                 System.out.println("[Interpreter] Defined Global Function: " + fullName);
             }
             return Value.VOID;
@@ -234,15 +236,17 @@ public class Main {
                 if (objVal.isInstance()) {
                     checkAccess(objVal.asInstance(), rightName);
 
-                    delphiParser.FunctionDeclarationContext methodFunc = findFunction(objVal.asInstance().type, rightName);
+                    // delphiParser.FunctionDeclarationContext methodFunc = findFunction(objVal.asInstance().type, rightName).ctx;
+                    FunctionSymbol methodFunc = findFunction(objVal.asInstance().type, rightName);
                     if (methodFunc != null) {
                         Environment previous = currentEnv;
-                        currentEnv = new Environment(previous);
+                        // currentEnv = new Environment(previous);
+                        currentEnv = new Environment(methodFunc.definitionEnv);
                         currentEnv.define("self", objVal);
                         currentEnv.define(rightName, new Value(0));
                         
-                        mapParameters(methodFunc.formalParameterList(), ctx.parameterList());
-                        visit(methodFunc.block());
+                        mapParameters(methodFunc.ctx.formalParameterList(), ctx.parameterList());
+                        visit(methodFunc.ctx.block());
                         
                         Value res = currentEnv.get(rightName);
                         currentEnv = previous;
@@ -271,7 +275,7 @@ public class Main {
             return null;
         }
 
-        private delphiParser.FunctionDeclarationContext findFunction(ClassSymbol clazz, String funcName) {
+        private FunctionSymbol findFunction(ClassSymbol clazz, String funcName) {
             if (clazz.functions.containsKey(funcName.toLowerCase())) {
                 return clazz.functions.get(funcName.toLowerCase());
             }
@@ -336,7 +340,7 @@ public class Main {
 
                 ProcedureSymbol methodCode = findMethod(instance.type, methodName.toLowerCase());
 
-                if (methodCode.ctx != null) {
+                if (methodCode != null) {
                     Environment previous = currentEnv;
                     currentEnv = new Environment(methodCode.definitionEnv);
                     // currentEnv = new Environment(previous); 
@@ -356,7 +360,7 @@ public class Main {
                     Value selfVal = currentEnv.get("self");
                     if (selfVal.isInstance()) {
                         ProcedureSymbol methodCode = findMethod(selfVal.asInstance().type, callName.toLowerCase());
-                        if (methodCode.ctx != null) {
+                        if (methodCode != null) {
                             Environment previous = currentEnv;
                             currentEnv = new Environment(methodCode.definitionEnv);
                             // currentEnv = new Environment(previous);
@@ -372,7 +376,7 @@ public class Main {
                 // normal global procedure call
                 // delphiParser.ProcedureDeclarationContext globalProc = currentEnv.getProcedure(callName).ctx;
                 ProcedureSymbol globalProc = currentEnv.getProcedure(callName);
-                if (globalProc.ctx != null) {
+                if (globalProc != null) {
                     Environment previous = currentEnv;
                     currentEnv = new Environment(globalProc.definitionEnv);
                     // currentEnv = new Environment(previous);
@@ -392,16 +396,18 @@ public class Main {
         @Override
         public Value visitFunctionDesignator(delphiParser.FunctionDesignatorContext ctx) {
             String funcName = ctx.identifier().getText();
-            delphiParser.FunctionDeclarationContext globalFunc = currentEnv.getFunction(funcName);
+            // delphiParser.FunctionDeclarationContext globalFunc = currentEnv.getFunction(funcName);
+            FunctionSymbol globalFunc = currentEnv.getFunction(funcName);
             
             if (globalFunc != null) {
                 Environment previous = currentEnv;
-                currentEnv = new Environment(previous);
+                // currentEnv = new Environment(previous);
+                currentEnv = new Environment(globalFunc.definitionEnv);
                 
                 currentEnv.define(funcName, new Value(0));
                 
-                mapParameters(globalFunc.formalParameterList(), ctx.parameterList());
-                visit(globalFunc.block());
+                mapParameters(globalFunc.ctx.formalParameterList(), ctx.parameterList());
+                visit(globalFunc.ctx.block());
                 
                 Value result = currentEnv.get(funcName);
                 currentEnv = previous;
@@ -718,12 +724,15 @@ public class Main {
                 String name = ctx.variable().getText();
 
                 if (!name.contains(".")) {
-                    delphiParser.FunctionDeclarationContext func = currentEnv.getFunction(name);
+                    // delphiParser.FunctionDeclarationContext func = currentEnv.getFunction(name);
+                    FunctionSymbol func = currentEnv.getFunction(name);
+
                     if (func != null && !currentEnv.isDefinedLocal(name)) {
                         Environment previous = currentEnv;
-                        currentEnv = new Environment(previous);
+                        // currentEnv = new Environment(previous);
+                        currentEnv = new Environment(func.definitionEnv);
                         currentEnv.define(name, new Value(0));
-                        visit(func.block());
+                        visit(func.ctx.block());
                         Value res = currentEnv.get(name);
                         currentEnv = previous;
                         return res;
@@ -733,13 +742,15 @@ public class Main {
                     if (currentEnv.isDefined(parts[0])) {
                         Value objVal = currentEnv.get(parts[0]);
                         if (objVal.isInstance()) {
-                            delphiParser.FunctionDeclarationContext methodFunc = findFunction(objVal.asInstance().type, parts[1]);
+                            // delphiParser.FunctionDeclarationContext methodFunc = findFunction(objVal.asInstance().type, parts[1]);
+                            FunctionSymbol methodFunc = findFunction(objVal.asInstance().type, parts[1]);
                             if (methodFunc != null && !currentEnv.isDefinedLocal(parts[1])) {
                                 Environment previous = currentEnv;
-                                currentEnv = new Environment(previous);
+                                // currentEnv = new Environment(previous);
+                                currentEnv = new Environment(methodFunc.definitionEnv);
                                 currentEnv.define("self", objVal);
                                 currentEnv.define(parts[1], new Value(0));
-                                visit(methodFunc.block());
+                                visit(methodFunc.ctx.block());
                                 Value res = currentEnv.get(parts[1]);
                                 currentEnv = previous;
                                 return res;
