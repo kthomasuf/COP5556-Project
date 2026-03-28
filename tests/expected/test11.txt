@@ -1,0 +1,26 @@
+=== 1. TESTING CONSTRUCTORS & MAP PARAMS ===
+--> [Parent] TEntity initialized. Auto-filled ID:
+0
+--> [Child] TPlayer Created.
+
+=== 2. TESTING STRINGS ===
+Welcome to the Arena!
+
+=== 3. TESTING REALS & GLOBAL FUNCTIONS ===
+Calculated Damage:
+25.0
+
+=== 4. TESTING METHOD PROCEDURES ===
+Taking damage...
+Damage taken successfully.
+
+=== 5. TESTING METHOD FUNCTIONS ===
+Status: Shriyans is still standing!
+
+=== 6. TESTING BOOLEANS ===
+Is the Hero alive? (Should be true)
+true
+Testing TRUE AND FALSE (Should be false):
+false
+
+Testing Complete!
