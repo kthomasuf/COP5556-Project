@@ -1,13 +1,20 @@
-# COP5556 - Project #1
+# COP5556 - Project #2
 
 ## Team Members
-Shriyans Arkal & Kenneth Thomas
+Shriyans Arkal (UFID: 52069214)
+Kenneth Thomas (UFID: 47801757)
 
 ## What is working?
-Our interpreter implementation and grammar additions successfully add functionality for classes, objects, constructors, destructors, and encapsulation to the predefined language. Class inheritance and related functionality was also implemented. In total we created 12 test files to showcase our implementation and demonstrate the parts of the language we added.
+For the first project milestone, our interpreter implementation and grammar additions successfully add functionality for classes, objects, constructors, destructors, and encapsulation to the predefined language. Class inheritance and related functionality was also implemented. 
+
+For the second project milestone, we were able to succesfully implement while-do and for-do loops, break and continue keywords, user defined procedures and functions, as well update our language to use static scoping. 
+
+In total we created 21 test files to showcase our implementation and demonstrate the parts of the language we added.
 
 ## Explanation of Implementation
 In order to add the previously listed functionality to the predefined language, several additions were added to the language grammar. Specifically, classes were added as a possible unpackedStructuredType with their accompanying grammar definitions, as well objects were able to be instantiated by adding grammar definitions to the predefined factor definitions. Apart from changes to the grammar we implemented a java interpreter that is able to navigate the abstract syntax tree and provide object oriented programming support that allows classes, objects, etc. to be defined and tested.
+
+Further updates to the predefined langauge allowed us to implement loops, keywords, and allow users to define their own procedures and functions. Moreover, changes to our interpreter allowed us to add static scoping to the language.
 
 ## Commands To Run Our Implementation
 
@@ -45,3 +52,12 @@ test9.pas -> Tests Inheritance
 test10.pas -> Tests Inheritance w/ Encapsulation  
 test11.pas -> Tests All Functionality  
 test12.pas -> Tests Object Oriented Programming w/ User Input  
+test13.pas -> Tests If-Else statements
+test14.pas -> Tests While Loop
+test15.pas -> Tests For Loop
+test16.pas -> Tests Break Keyword in For Loop
+test17.pas -> Tests Continue Keyword in For Loop
+test18.pas -> Tests Break Keyword in While Loop
+test19.pas -> Tests Continue Keyword in While Loop
+test20.pas -> Tests Static Scoping for Procedures
+test21.pas -> Tests Static Scoping for Functions
