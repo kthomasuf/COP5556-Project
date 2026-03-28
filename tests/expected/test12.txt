@@ -1,0 +1,5 @@
+--- Bank Terminal ---
+How much money would you like to deposit? (Enter an integer)
+Depositing your money into the object...
+Your current balance is: 
+250

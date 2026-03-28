@@ -329,8 +329,7 @@ public class Main {
                     if (instance.type.destructorImpl != null) {
                         System.out.println("[Runtime] Executing Destructor");
                         Environment previous = currentEnv;
-                        currentEnv = new Environment(procSymbol.definitionEnv);
-                        // currentEnv = new Environment(previous);
+                        currentEnv = new Environment(previous);
                         currentEnv.define("self", objVal);
                         visit(instance.type.destructorImpl.block());
                         currentEnv = previous;
