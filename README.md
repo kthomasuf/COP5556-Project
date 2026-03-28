@@ -14,14 +14,12 @@ In order to add the previously listed functionality to the predefined language, 
 ### Generate Lexer and Parser
 
 ```bash
-java -jar antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.delphi -o my/delphi delphi.g4
 java -jar lib/antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.delphi -o src/my/delphi grammar/delphi.g4
 ```
 
 ### Compile Interpreter Code
 
 ```bash
-javac -cp .:antlr-4.13.2-complete.jar Main.java Value.java Instance.java Environment.java ClassSymbol.java BreakException.java ContinueException.java ProcedureSymbol.java FunctionSymbol.java my/delphi/*.java
 javac -cp .:lib/antlr-4.13.2-complete.jar src/Main.java src/Value.java src/Instance.java src/Environment.java src/ClassSymbol.java src/BreakException.java src/ContinueException.java src/ProcedureSymbol.java src/FunctionSymbol.java src/my/delphi/*.java
 ```
 
@@ -30,7 +28,6 @@ javac -cp .:lib/antlr-4.13.2-complete.jar src/Main.java src/Value.java src/Insta
 Modify test1.pas to execute different test files (ex. test2.pas)
 
 ```bash
-java -cp .:antlr-4.13.2-complete.jar Main test1.pas
 java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/test1.pas
 ```
 
