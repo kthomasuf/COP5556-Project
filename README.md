@@ -17,6 +17,7 @@ In order to add the previously listed functionality to the predefined language, 
 Further updates to the predefined langauge allowed us to implement loops, keywords, and allow users to define their own procedures and functions. Moreover, changes to our interpreter allowed us to add static scoping to the language.
 
 ## Commands To Run Our Implementation
+To avoid potential complications, please fun the following commands from the project root directory.
 
 ### Generate Lexer and Parser
 
