@@ -32,7 +32,7 @@ java -jar lib/antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.del
 ### Compile Interpreter Code
 
 ```bash
-javac -cp .:lib/antlr-4.13.2-complete.jar src/Main.java src/Value.java src/Instance.java src/Environment.java src/ClassSymbol.java src/BreakException.java src/ContinueException.java src/ProcedureSymbol.java src/FunctionSymbol.java src/my/delphi/*.java
+javac -cp .:lib/antlr-4.13.2-complete.jar src/Main.java src/Value.java src/Instance.java src/Environment.java src/ClassSymbol.java src/BreakException.java src/ContinueException.java src/ProcedureSymbol.java src/FunctionSymbol.java src/DelphiInterpreter.java src/LLVMCodeGenerator.java src/my/delphi/*.java
 ```
 
 ### Run The Interpreter
