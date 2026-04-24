@@ -21,7 +21,7 @@ public class Main {
             if (compileMode) {
                 LLVMCodeGenerator generator = new LLVMCodeGenerator();
                 generator.visit(parser.program());
-                // generator.writeToFile("output.ll");
+                generator.writeToFile("output.ll");
             }
             else {
                 DelphiInterpreter interpreter = new DelphiInterpreter();

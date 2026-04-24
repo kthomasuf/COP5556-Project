@@ -20,6 +20,8 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
     // store variable name and it's type
     private Map<String, String> varTypes = new HashMap<>();
+    // store temporary register types
+    private Map<String, String> tempTypes = new HashMap<>();
 
     // classes temporarily skipped
 
@@ -30,10 +32,10 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
     // Helper Methods
     private boolean isGlobalScope = true;
     private StringBuilder llvmOutput = new StringBuilder();
-    private int operationCounter = 0;
+    private int tempCounter = 0;
 
-    private String newOperation() {
-        return "%" + operationCounter++;
+    private String newTemp() {
+        return "%" + tempCounter++;
     }
 
     private void emit(String instruction) {
@@ -60,6 +62,14 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         throw new RuntimeException("Undefined variable: " + name);
     }
 
+    private String getType(String reg) {
+        if (tempTypes.containsKey(reg)) return tempTypes.get(reg);
+        String name = reg.replace("%", "").replace("@", "");
+        if (varTypes.containsKey(name)) return varTypes.get(name);
+        if (reg.contains(".")) return "float";
+        return "i32";
+    }
+
     public void writeToFile(String filename) throws IOException {
         Files.writeString(Path.of(filename), llvmOutput.toString());
     }
@@ -68,7 +78,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         switch (pascalType) {
             case "integer": return "i32";
             case "long": return "i64";
-            case "real":    return "double";
+            case "real":    return "float";
             case "boolean": return "i1";
             case "char":    return "i8";
             case "string":  return "i8*";
@@ -79,7 +89,9 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
     @Override
     public String visitProgram(delphiParser.ProgramContext ctx) {
+        pushScope();
         visit(ctx.block());
+        popScope();
         return null;
     }
 
@@ -139,8 +151,23 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             emit("  store " + llvmType + " " + valueRegister + ", " + llvmType + "* " + varLoc);
         }
         
-        System.out.println("[LLVM] Assignment: " + varName + " = " + valueReg);
+        System.out.println("[LLVM] Assignment: " + varName + " = " + valueRegister);
         return null;
+    }
+
+    @Override
+    public String visitVariable(delphiParser.VariableContext ctx) {
+        String varName = ctx.getText().toLowerCase();
+        String varLoc = lookupVar(varName);
+        String type = varTypes.get(varName);
+        String result = newTemp();
+
+        emit("  " + result + " = load " + type + ", " + type + "* " + varLoc);
+
+        tempTypes.put(result, type);
+
+        System.out.println("[LLVM] Load var: " + varName + " into " + result);
+        return result;
     }
 
     @Override
@@ -155,5 +182,194 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             visit(stmt);
         }
         return null;
+    }
+
+    // relational operator support
+    @Override
+    public String visitExpression(delphiParser.ExpressionContext ctx) {
+        String left = visit(ctx.simpleExpression());
+
+        if (ctx.relationaloperator() != null) {
+            String right = visit(ctx.expression());
+            String operator = ctx.relationaloperator().getText().toUpperCase();
+            String result = newTemp();
+
+            String leftType = getType(left);
+            String rightType = getType(right);
+
+            if (leftType.equals("float") || rightType.equals("float")) {
+                switch (operator) {
+                    case "=": emit("  " + result + " = fcmp oeq float " + left + ", " + right); break;
+                    case "<>": emit("  " + result + " = fcmp one float " + left + ", " + right); break;
+                    case "<": emit("  " + result + " = fcmp olt float " + left + ", " + right); break;
+                    case "<=": emit("  " + result + " = fcmp ole float " + left + ", " + right); break;
+                    case ">": emit("  " + result + " = fcmp ogt float " + left + ", " + right); break;
+                    case ">=": emit("  " + result + " = fcmp oge float " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            else if (leftType.equals("i1") || rightType.equals("i1")) {
+                switch (operator) {
+                    case "=": emit("  " + result + " = icmp eq i1 " + left + ", " + right); break;
+                    case "<>": emit("  " + result + " = icmp ne i1 " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            else {
+                switch (operator) {
+                    case "=": emit("  " + result + " = icmp eq i32 " + left + ", " + right); break;
+                    case "<>": emit("  " + result + " = icmp ne i32 " + left + ", " + right); break;
+                    case "<": emit("  " + result + " = icmp slt i32 " + left + ", " + right); break;
+                    case "<=": emit("  " + result + " = icmp sle i32 " + left + ", " + right); break;
+                    case ">": emit("  " + result + " = icmp sgt i32 " + left + ", " + right); break;
+                    case ">=": emit("  " + result + " = icmp sge i32 " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            tempTypes.put(result, "i1");
+            return result;
+        }
+        return left;
+    }
+    
+    // basic math support, need to add more operators and precedence handling 
+    @Override
+    public String visitSimpleExpression(delphiParser.SimpleExpressionContext ctx) {
+        String left = visit(ctx.term());
+
+        if (ctx.additiveoperator() != null) {
+            String right = visit(ctx.simpleExpression());
+            String operator = ctx.additiveoperator().getText().toUpperCase();
+            String result = newTemp();
+
+            String leftType = getType(left);
+            String rightType = getType(right);
+
+            String resultType = (leftType.equals("float") || rightType.equals("float")) ? "float" : "i32";
+
+            if (leftType.equals("float") || rightType.equals("float")) {
+                switch (operator) {
+                    case "+": emit("  " + result + " = fadd float " + left + ", " + right); break;
+                    case "-": emit("  " + result + " = fsub float " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            else if (operator.equals("OR")) {
+                if (leftType.equals("i1") || rightType.equals("i1")) {
+                    emit("  " + result + " = or i1 " + left + ", " + right);
+                    resultType = "i1";
+                } else {
+                    emit("  " + result + " = or i32 " + left + ", " + right);
+                    resultType = "i32";
+                }
+            }
+            else {
+                switch (operator) {
+                    case "+": emit("  " + result + " = add i32 " + left + ", " + right); break;
+                    case "-": emit("  " + result + " = sub i32 " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }  
+            }
+            tempTypes.put(result, resultType);
+            return result;
+        }
+        return left;
+    }
+
+    // multiplicative math support
+    @Override
+    public String visitTerm(delphiParser.TermContext ctx) {
+        String left = visit(ctx.signedFactor());
+
+        if (ctx.multiplicativeoperator() != null) {
+            String right = visit(ctx.term());
+            String operator = ctx.multiplicativeoperator().getText().toUpperCase();
+            String result = newTemp();
+
+            String leftType = getType(left);
+            String rightType = getType(right);
+
+            String resultType = (leftType.equals("float") || rightType.equals("float")) ? "float" : "i32";
+
+            if (leftType.equals("float") || rightType.equals("float")) {
+                switch (operator) {
+                    case "*": emit("  " + result + " = fmul float " + left + ", " + right); break;
+                    case "/": emit("  " + result + " = fdiv float " + left + ", " + right); break;
+                    case "DIV": emit("  " + result + " = fdiv float " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            else if (leftType.equals("i1") || rightType.equals("i1")) {
+                switch (operator) {
+                    case "AND": emit("  " + result + " = and i32 " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            else {
+                switch (operator) {
+                    case "*": emit("  " + result + " = mul i32 " + left + ", " + right); break;
+                    case "/": emit("  " + result + " = sdiv i32 " + left + ", " + right); break;
+                    case "DIV": emit("  " + result + " = sdiv i32 " + left + ", " + right); break;
+                    case "MOD": emit("  " + result + " = srem i32 " + left + ", " + right); break;
+                    default: throw new RuntimeException("Unknown operator: " + operator);
+                }
+            }
+            tempTypes.put(result, resultType);
+            return result;
+        }
+        return left;
+    }
+
+    // reading values
+    @Override
+    public String visitFactor(delphiParser.FactorContext ctx) {
+        if (ctx.bool_() != null) {
+            String result = newTemp();
+            String val = ctx.bool_().TRUE() != null ? "1" : "0";
+            emit("  " + result + " = add i1 0, " + val);
+            tempTypes.put(result, "i1");
+            return result;
+        }
+        
+        if (ctx.NOT() != null) {
+            String val = visit(ctx.factor());
+            String result = newTemp();
+            String type = getType(val);
+            if (type.equals("i1")) {
+                // boolean NOT
+                emit("  " + result + " = xor i1 " + val + ", 1");
+                tempTypes.put(result, "i1");
+            }
+            else {
+                // bitwise NOT on integer
+                emit("  " + result + " = xor i32 " + val + ", -1");
+                tempTypes.put(result, "i32");
+            }
+            return result;
+        }
+        
+        if (ctx.functionDesignator() != null) return visit(ctx.functionDesignator()); 
+
+        if (ctx.LPAREN() != null) return visit(ctx.expression());
+
+        if (ctx.unsignedConstant() != null) {
+            String text = ctx.unsignedConstant().getText();
+            if (text.startsWith("'")) {
+                // handle strings later
+                return text;
+            }
+            if (text.contains(".") || text.toLowerCase().contains("e")) {
+                tempTypes.put(text, "float");
+                return text;
+            }
+            return text;
+        }
+
+        if (ctx.variable() != null) {
+            return visit(ctx.variable());
+
+            // add class/function logic again later
+        }
+        return "0";
     }
 }
