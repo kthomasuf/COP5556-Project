@@ -73,6 +73,18 @@ expected_output() {
         class_inherited_fields)
             printf "12"
             ;;
+        control_break_continue)
+            printf "8"
+            ;;
+        control_for_loop)
+            printf "10"
+            ;;
+        control_if_else)
+            printf "1"
+            ;;
+        control_while_loop)
+            printf "10"
+            ;;
     esac
 }
 

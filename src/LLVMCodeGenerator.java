@@ -56,14 +56,39 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
     private boolean isGlobalScope = true;
     private StringBuilder llvmOutput = new StringBuilder();
     private int tempCounter = 0;
+    private int labelCounter = 0;
+    private boolean blockTerminated = false;
+    private Deque<String> breakLabels = new ArrayDeque<>();
+    private Deque<String> continueLabels = new ArrayDeque<>();
     private String currentClass = null;
 
     private String newTemp() {
         return "%t" + tempCounter++;
     }
 
+    private String newLabel(String prefix) {
+        return prefix + "." + labelCounter++;
+    }
+
     private void emit(String instruction) {
         llvmOutput.append(instruction).append("\n");
+    }
+
+    private void emitLabel(String label) {
+        llvmOutput.append(label).append(":\n");
+        blockTerminated = false;
+    }
+
+    private void emitBranch(String label) {
+        if (!blockTerminated) {
+            emit("  br label %" + label);
+            blockTerminated = true;
+        }
+    }
+
+    private void emitConditionalBranch(String condition, String trueLabel, String falseLabel) {
+        emit("  br i1 " + condition + ", label %" + trueLabel + ", label %" + falseLabel);
+        blockTerminated = true;
     }
 
     private void pushScope() {
@@ -119,6 +144,9 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         } else if (fromType.equals("float") && toType.equals("i32")) {
             result = newTemp();
             emit("  " + result + " = fptosi float " + value + " to i32");
+        } else if (fromType.equals("float") && toType.equals("i1")) {
+            result = newTemp();
+            emit("  " + result + " = fcmp one float " + value + ", 0.0");
         } else {
             throw new RuntimeException("[LLVM] Unsupported cast from " + fromType + " to " + toType);
         }
@@ -203,7 +231,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         pushScope();
         visit(ctx.compoundStatement());
         popScope();
-        emit("  ret i32 0");
+        if (!blockTerminated) emit("  ret i32 0");
         emit("}");
         return null;
     }
@@ -497,6 +525,137 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         for (delphiParser.StatementContext stmt : ctx.statement()) {
             visit(stmt);
         }
+        return null;
+    }
+
+    private String conditionToI1(String value) {
+        String type = getType(value);
+        return castTo(value, type, "i1");
+    }
+
+    @Override
+    public String visitBreakStatement(delphiParser.BreakStatementContext ctx) {
+        if (breakLabels.isEmpty()) throw new RuntimeException("[LLVM] BREAK used outside loop");
+        emitBranch(breakLabels.peek());
+        return null;
+    }
+
+    @Override
+    public String visitContinueStatement(delphiParser.ContinueStatementContext ctx) {
+        if (continueLabels.isEmpty()) throw new RuntimeException("[LLVM] CONTINUE used outside loop");
+        emitBranch(continueLabels.peek());
+        return null;
+    }
+
+    @Override
+    public String visitIfStatement(delphiParser.IfStatementContext ctx) {
+        String thenLabel = newLabel("if.then");
+        String elseLabel = ctx.ELSE() != null ? newLabel("if.else") : null;
+        String endLabel = newLabel("if.end");
+
+        String condition = conditionToI1(visit(ctx.expression()));
+        emitConditionalBranch(condition, thenLabel, elseLabel != null ? elseLabel : endLabel);
+
+        emitLabel(thenLabel);
+        visit(ctx.statement(0));
+        emitBranch(endLabel);
+
+        if (elseLabel != null) {
+            emitLabel(elseLabel);
+            visit(ctx.statement(1));
+            emitBranch(endLabel);
+        }
+
+        emitLabel(endLabel);
+        return null;
+    }
+
+    @Override
+    public String visitWhileStatement(delphiParser.WhileStatementContext ctx) {
+        String condLabel = newLabel("while.cond");
+        String bodyLabel = newLabel("while.body");
+        String endLabel = newLabel("while.end");
+
+        emitBranch(condLabel);
+
+        emitLabel(condLabel);
+        String condition = conditionToI1(visit(ctx.expression()));
+        emitConditionalBranch(condition, bodyLabel, endLabel);
+
+        breakLabels.push(endLabel);
+        continueLabels.push(condLabel);
+
+        emitLabel(bodyLabel);
+        visit(ctx.statement());
+        emitBranch(condLabel);
+
+        continueLabels.pop();
+        breakLabels.pop();
+
+        emitLabel(endLabel);
+        return null;
+    }
+
+    @Override
+    public String visitForStatement(delphiParser.ForStatementContext ctx) {
+        String varName = ctx.identifier().getText().toLowerCase();
+        String varLoc = lookupVar(varName);
+        String varType = varTypes.get(varName);
+        if (varType == null) throw new RuntimeException("[LLVM] Unknown for-loop variable: " + varName);
+        if (!varType.equals("i32")) throw new RuntimeException("[LLVM] FOR loop variable must be integer");
+
+        String start = visit(ctx.forList().initialValue().expression());
+        start = castTo(start, getType(start), "i32");
+        String end = visit(ctx.forList().finalValue().expression());
+        end = castTo(end, getType(end), "i32");
+        boolean isTo = ctx.forList().TO() != null;
+
+        String condLabel = newLabel("for.cond");
+        String bodyLabel = newLabel("for.body");
+        String updateLabel = newLabel("for.update");
+        String endLabel = newLabel("for.end");
+
+        emit("  store i32 " + start + ", i32* " + varLoc);
+        emitBranch(condLabel);
+
+        emitLabel(condLabel);
+        String current = newTemp();
+        String compare = newTemp();
+        emit("  " + current + " = load i32, i32* " + varLoc);
+        if (isTo) {
+            emit("  " + compare + " = icmp sle i32 " + current + ", " + end);
+        } else {
+            emit("  " + compare + " = icmp sge i32 " + current + ", " + end);
+        }
+        setType(current, "i32");
+        setType(compare, "i1");
+        emitConditionalBranch(compare, bodyLabel, endLabel);
+
+        breakLabels.push(endLabel);
+        continueLabels.push(updateLabel);
+
+        emitLabel(bodyLabel);
+        visit(ctx.statement());
+        emitBranch(updateLabel);
+
+        emitLabel(updateLabel);
+        String updateCurrent = newTemp();
+        String next = newTemp();
+        emit("  " + updateCurrent + " = load i32, i32* " + varLoc);
+        if (isTo) {
+            emit("  " + next + " = add i32 " + updateCurrent + ", 1");
+        } else {
+            emit("  " + next + " = sub i32 " + updateCurrent + ", 1");
+        }
+        emit("  store i32 " + next + ", i32* " + varLoc);
+        setType(updateCurrent, "i32");
+        setType(next, "i32");
+        emitBranch(condLabel);
+
+        continueLabels.pop();
+        breakLabels.pop();
+
+        emitLabel(endLabel);
         return null;
     }
 
