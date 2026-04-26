@@ -10,6 +10,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
@@ -34,6 +35,22 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         String type;
     }
 
+    private static class ProcedureInfo {
+        String name;
+        String ownerClass;
+        LinkedHashMap<String, String> params = new LinkedHashMap<>();
+    }
+
+    private static class FunctionInfo {
+        String name;
+        String returnType;
+        String ownerClass;
+        LinkedHashMap<String, String> params = new LinkedHashMap<>();
+    }
+
+    String currentFunctionName = null;
+    String currentFunctionReturnType = null;
+
     // State
     // Handle scope, doesn't need external class sicne not handling values
     // Store scopes as hashmap, each map stores variable name and LLVM variable name
@@ -46,11 +63,8 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
     private Map<String, String> tempTypes = new HashMap<>();
     private Map<String, ClassInfo> classes = new HashMap<>();
 
-    // classes temporarily skipped
-
-    // procedures and functions can share these, definitions are essentially the same
-    private Map<String, String> funcReturnTypes = new HashMap<>();
-    private Map<String, List<String>> funcParamTypes = new HashMap<>();
+    private Map<String, ProcedureInfo> procedures = new HashMap<>();
+    private Map<String, FunctionInfo> functions = new HashMap<>();
 
     // Helper Methods
     private boolean isGlobalScope = true;
@@ -219,20 +233,35 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
    @Override
     public String visitBlock(delphiParser.BlockContext ctx) {
-        // skipping classes for now
         // class metadata has to be available before vars are lowered
-        for (delphiParser.TypeDefinitionPartContext t : ctx.typeDefinitionPart()) visit(t);
-        completeClassLayouts();
-        emitClassTypes();
+        if (isGlobalScope) {
+            // class metadata only needs to be processed once at global level
+            for (delphiParser.TypeDefinitionPartContext t : ctx.typeDefinitionPart()) visit(t);
+            completeClassLayouts();
+            emitClassTypes();
+        }
         for (delphiParser.VariableDeclarationPartContext v : ctx.variableDeclarationPart()) visit(v);
         for (delphiParser.ProcedureAndFunctionDeclarationPartContext p : ctx.procedureAndFunctionDeclarationPart()) visit(p);
-        emit("define i32 @main() {");
-        emit("entry:");
-        pushScope();
-        visit(ctx.compoundStatement());
-        popScope();
-        if (!blockTerminated) emit("  ret i32 0");
-        emit("}");
+        // emit("define i32 @main() {");
+        // emit("entry:");
+        // pushScope();
+        // visit(ctx.compoundStatement());
+        // popScope();
+        // if (!blockTerminated) emit("  ret i32 0");
+        // emit("}");
+
+        if (isGlobalScope) {
+            emit("define i32 @main() {");
+            emit("entry:");
+            pushScope();
+            visit(ctx.compoundStatement());
+            popScope();
+            if (!blockTerminated) emit("  ret i32 0");
+            emit("}");
+        }
+        else {
+            visit(ctx.compoundStatement());
+        }
         return null;
     }
 
@@ -342,6 +371,484 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
     }
 
     @Override
+    public String visitProcedureDeclaration(delphiParser.ProcedureDeclarationContext ctx) {
+        String fullName = ctx.scopedIdentifier().getText();
+
+        ProcedureInfo procInfo = new ProcedureInfo();
+
+        // check if global or class procedure
+        if (fullName.contains(".")) {
+            // method for a class with scoped notation (className.methodName)
+            String[] parts = fullName.split("\\.");
+            String className = parts[0];
+            String methodName = parts[1];
+
+            procInfo.ownerClass = className;
+            procInfo.name = methodName;
+        } else {
+            // normal global procedure
+            procInfo.ownerClass = null;
+            procInfo.name = fullName;
+        }
+
+        // add parameters to procedure information
+        if (ctx.formalParameterList() != null) {
+            for (delphiParser.FormalParameterSectionContext section : ctx.formalParameterList().formalParameterSection()) {
+                String paramType = toLLVMType(section.parameterGroup().typeIdentifier().getText().toLowerCase());
+                for (delphiParser.IdentifierContext id : section.parameterGroup().identifierList().identifier()) {
+                    procInfo.params.put(id.getText().toLowerCase(), paramType);
+                }
+            }
+        }
+
+        procedures.put(fullName.toLowerCase(), procInfo);
+
+        // build LLVM procedure header
+        String llvmProcName = procInfo.ownerClass != null
+            ? procInfo.ownerClass + "_" + procInfo.name
+            : procInfo.name;
+
+        StringBuilder params = new StringBuilder();
+        if (procInfo.ownerClass != null) {
+            ClassInfo classInfo = classes.get(procInfo.ownerClass.toLowerCase());
+            if (classInfo != null) {
+                params.append("%" + classInfo.name + "* %self");
+            }
+        }
+        // add parameters
+        boolean first = procInfo.ownerClass == null;
+        for (Map.Entry<String, String> param : procInfo.params.entrySet()) {
+            String paramName = param.getKey();
+            String paramType = param.getValue();
+            if (!first) params.append(", ");
+            params.append(paramType).append(" %").append(paramName);
+            first = false;
+        }
+
+        emit("");
+        emit("define void @" + llvmProcName + "(" + params + ") {");
+        emit("entry:");
+
+        isGlobalScope = false;
+        pushScope();
+
+        // if procedure is a part of class add self as a local variable
+        if (procInfo.ownerClass != null) {
+            ClassInfo classInfo = classes.get(procInfo.ownerClass.toLowerCase());
+            if (classInfo != null) {
+                String selfType = "%" + classInfo.name + "*";
+                emit("  %self.addr = alloca " + selfType);
+                emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
+                defineVar("self", "%self.addr");
+                varTypes.put("self", selfType);
+            }
+        }
+
+        // add local variables
+        for (Map.Entry<String, String> param : procInfo.params.entrySet()) {
+            String paramName = param.getKey();
+            String paramType = param.getValue();
+            emit("  %" + paramName + ".addr = alloca " + paramType);
+            emit("  store " + paramType + " %" + paramName + ", " + paramType + "* %" + paramName + ".addr");
+            defineVar(paramName, "%" + paramName + ".addr");
+            varTypes.put(paramName, paramType);
+        }
+
+        visit(ctx.block());
+
+        emit("  ret void");
+        emit("}");
+
+        popScope();
+        isGlobalScope = true;
+
+        return null;
+    }
+
+    // procedure calls like writeln, methods or normal procedures
+    @Override
+    public String visitProcedureStatement(delphiParser.ProcedureStatementContext ctx) {
+        String callName = ctx.variable().getText().toLowerCase();
+
+        if (callName.equalsIgnoreCase("WriteLn")) {
+            if (ctx.parameterList() != null) {
+                emitWriteLn(ctx.parameterList());
+            }
+            return null;
+        }
+
+        if (callName.equalsIgnoreCase("ReadLn")) {
+            if (ctx.parameterList() != null) {
+                emitReadLn(ctx.parameterList());
+            }
+            return null;
+        }
+
+        // class method
+        if (callName.contains(".")) {
+            String[] parts = callName.split("\\.");
+            String objectName = parts[0];
+            String methodName = parts[1];
+
+            // lookup object
+            String objectLoc = lookupVar(objectName);
+            String className = varClassTypes.get(objectName);
+            if (className == null) {
+                throw new RuntimeException(objectName + " is not an object!");
+            }
+
+            String mapKey = className + "." + methodName;
+            ProcedureInfo procInfo = procedures.get(mapKey.toLowerCase());
+            if (procInfo == null) {
+                throw new RuntimeException("[LLVM] Undefined procedure: " + callName);
+            }
+
+            ClassInfo classInfo = classes.get(className.toLowerCase());
+            if (classInfo == null) throw new RuntimeException("[LLVM] Unknown class: " + className);
+            String originalClassName = classInfo.name;
+
+            // add self register
+            String selfReg = newTemp();
+            String selfType = "%" + originalClassName + "*";
+            emit("  " + selfReg + " = load " + selfType + ", " + selfType + "* " + objectLoc);
+            tempTypes.put(selfReg, selfType);
+
+            // self already added
+            StringBuilder args = new StringBuilder();
+            args.append(selfType).append(" ").append(selfReg);
+            if (ctx.parameterList() != null) {
+                for (delphiParser.ActualParameterContext param : ctx.parameterList().actualParameter()) {
+                    args.append(", ");
+                    String argReg = visit(param.expression());
+                    String argType = getType(argReg);
+                    args.append(argType).append(" ").append(argReg);
+                }
+            }
+
+            emit("  call void @" + originalClassName + "_" + procInfo.name + "(" + args + ")");
+            return null;
+        }
+
+        // get user defined procedure
+        ProcedureInfo procInfo = procedures.get(callName);
+        if (procInfo == null) {
+            throw new RuntimeException("[LLVM] Undefined procedure: " + callName);
+        }
+
+        // given procedure define passed in arguments
+        StringBuilder args = new StringBuilder();
+        if (ctx.parameterList() != null) {
+            boolean first = true;
+            for (delphiParser.ActualParameterContext param : ctx.parameterList().actualParameter()) {
+                if (!first) args.append(", ");
+                String argReg = visit(param.expression());
+                String argType = getType(argReg);
+                args.append(argType).append(" ").append(argReg);
+                first = false;
+            }
+        }
+
+        emit("  call void @" + procInfo.name + "(" + args + ")");
+        return null;
+    }
+
+    @Override
+    public String visitFunctionDeclaration(delphiParser.FunctionDeclarationContext ctx) {
+        String fullName = ctx.scopedIdentifier().getText();
+
+        FunctionInfo funcInfo = new FunctionInfo();
+
+        // check if global or class function
+        if (fullName.contains(".")) {
+            // method for a class with scoped notation (className.methodName)
+            String[] parts = fullName.split("\\.");
+            String className = parts[0];
+            String methodName = parts[1];
+
+            funcInfo.ownerClass = className;
+            funcInfo.name = methodName;
+        } else {
+            // normal global procedure
+            funcInfo.ownerClass = null;
+            funcInfo.name = fullName;
+        }
+
+        // add parameters to procedure information
+        if (ctx.formalParameterList() != null) {
+            for (delphiParser.FormalParameterSectionContext section : ctx.formalParameterList().formalParameterSection()) {
+                String paramType = toLLVMType(section.parameterGroup().typeIdentifier().getText().toLowerCase());
+                for (delphiParser.IdentifierContext id : section.parameterGroup().identifierList().identifier()) {
+                    funcInfo.params.put(id.getText().toLowerCase(), paramType);
+                }
+            }
+        }
+
+        String llvmReturnType = toLLVMType(ctx.resultType().getText().toLowerCase());
+        funcInfo.returnType = llvmReturnType;
+
+        functions.put(fullName.toLowerCase(), funcInfo);
+
+        // build LLVM function header
+        String llvmFuncName = funcInfo.ownerClass != null
+            ? funcInfo.ownerClass + "_" + funcInfo.name
+            : funcInfo.name;
+
+        StringBuilder params = new StringBuilder();
+        if (funcInfo.ownerClass != null) {
+            ClassInfo classInfo = classes.get(funcInfo.ownerClass.toLowerCase());
+            if (classInfo != null) {
+                params.append("%" + classInfo.name + "* %self");
+            }
+        }
+        // add parameters
+        boolean first = funcInfo.ownerClass == null;
+        for (Map.Entry<String, String> param : funcInfo.params.entrySet()) {
+            String paramName = param.getKey();
+            String paramType = param.getValue();
+            if (!first) params.append(", ");
+            params.append(paramType).append(" %").append(paramName);
+            first = false;
+        }
+
+        emit("");
+        emit("define " + llvmReturnType + " @" + llvmFuncName + "(" + params + ") {");
+        emit("entry:");
+
+        isGlobalScope = false;
+        pushScope();
+
+        // if function is a part of class add self as a local variable
+        if (funcInfo.ownerClass != null) {
+            ClassInfo classInfo = classes.get(funcInfo.ownerClass.toLowerCase());
+            if (classInfo != null) {
+                String selfType = "%" + classInfo.name + "*";
+                emit("  %self.addr = alloca " + selfType);
+                emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
+                defineVar("self", "%self.addr");
+                varTypes.put("self", selfType);
+            }
+        }
+
+        currentFunctionName = funcInfo.name.toLowerCase();
+        currentFunctionReturnType = llvmReturnType;
+
+        emit("  %result.addr = alloca " + llvmReturnType);
+        emit("  store " + llvmReturnType + " " + defaultValue(llvmReturnType) + ", " + llvmReturnType + "* %result.addr");
+        defineVar(currentFunctionName, "%result.addr");
+        varTypes.put(currentFunctionName, llvmReturnType);
+
+        // add local variables
+        for (Map.Entry<String, String> param : funcInfo.params.entrySet()) {
+            String paramName = param.getKey();
+            String paramType = param.getValue();
+            emit("  %" + paramName + ".addr = alloca " + paramType);
+            emit("  store " + paramType + " %" + paramName + ", " + paramType + "* %" + paramName + ".addr");
+            defineVar(paramName, "%" + paramName + ".addr");
+            varTypes.put(paramName, paramType);
+        }
+
+        visit(ctx.block());
+
+        // load return value for functions
+        String retVal = newTemp();
+        emit("  " + retVal + " = load " + llvmReturnType + ", " + llvmReturnType + "* %result.addr");
+        emit("  ret " + llvmReturnType + " " + retVal);
+        emit("}");
+
+        popScope();
+        isGlobalScope = true;
+
+        currentFunctionName = null;
+        currentFunctionReturnType = null;
+        return null;
+    }
+
+    @Override
+    public String visitFunctionDesignator(delphiParser.FunctionDesignatorContext ctx) {
+        String callName = ctx.identifier().getText().toLowerCase();
+
+        // class method
+        if (callName.contains(".")) {
+            String[] parts = callName.split("\\.");
+            String objectName = parts[0];
+            String methodName = parts[1];
+
+            // lookup object
+            String objectLoc = lookupVar(objectName);
+            String className = varClassTypes.get(objectName);
+            if (className == null) {
+                throw new RuntimeException(objectName + " is not an object!");
+            }
+
+            String mapKey = className + "." + methodName;  
+            FunctionInfo funcInfo = functions.get(mapKey);
+            if (funcInfo == null) {
+                throw new RuntimeException("[LLVM] Undefined function: " + callName);
+            }
+
+            // add self register
+            String selfReg = newTemp();
+            String selfType = "%" + funcInfo.ownerClass + "*";
+            emit("  " + selfReg + " = load " + selfType + ", " + selfType + "* " + objectLoc);
+            tempTypes.put(selfReg, selfType);
+
+            // self already added
+            StringBuilder args = new StringBuilder();
+            args.append(selfType).append(" ").append(selfReg);
+            if (ctx.parameterList() != null) {
+                for (delphiParser.ActualParameterContext param : ctx.parameterList().actualParameter()) {
+                    args.append(", ");
+                    String argReg = visit(param.expression());
+                    String argType = getType(argReg);
+                    args.append(argType).append(" ").append(argReg);
+                }
+            }
+
+            String result = newTemp();
+            emit("  " + result + " = call " + funcInfo.returnType + " @" + className + "_" + methodName + "(" + args + ")");
+            tempTypes.put(result, funcInfo.returnType);
+            
+            return result;
+        }
+
+        // get user defined procedure
+        FunctionInfo funcInfo = functions.get(callName);
+        if (funcInfo == null) {
+            throw new RuntimeException("[LLVM] Undefined function: " + callName);
+        }
+
+        // given function define passed in arguments
+        StringBuilder args = new StringBuilder();
+        if (ctx.parameterList() != null) {
+            boolean first = true;
+            for (delphiParser.ActualParameterContext param : ctx.parameterList().actualParameter()) {
+                if (!first) args.append(", ");
+                String argReg = visit(param.expression());
+                String argType = getType(argReg);
+                args.append(argType).append(" ").append(argReg);
+                first = false;
+            }
+        }
+
+        // store result in temp register
+        String result = newTemp();
+        emit("  " + result + " = call " + funcInfo.returnType + " @" + callName + "(" + args + ")");
+        tempTypes.put(result, funcInfo.returnType);
+
+        return result;
+    }
+
+    @Override
+    public String visitConstructorDeclaration(delphiParser.ConstructorDeclarationContext ctx) {
+        String fullName = ctx.scopedIdentifier().getText();
+        if (fullName.contains(".")) {
+            String[] parts = fullName.split("\\.");
+            String className = parts[0];
+            String constructorName = parts[1];
+
+            ClassInfo classInfo = classes.get(className.toLowerCase());
+            if (classInfo == null) throw new RuntimeException("[LLVM] Unknown class: " + className);
+
+            String selfType = "%" + classInfo.name + "*";
+            String llvmName = className + "_" + constructorName;
+
+            // collect parameters, needs own map since does use procedure infastructure
+            LinkedHashMap<String, String> params = new LinkedHashMap<>();
+            if (ctx.formalParameterList() != null) {
+                for (delphiParser.FormalParameterSectionContext section : ctx.formalParameterList().formalParameterSection()) {
+                    String paramType = toLLVMType(section.parameterGroup().typeIdentifier().getText().toLowerCase());
+                    for (delphiParser.IdentifierContext id : section.parameterGroup().identifierList().identifier()) {
+                        params.put(id.getText().toLowerCase(), paramType);
+                    }
+                }
+            }
+
+            StringBuilder paramStr = new StringBuilder();
+            paramStr.append(selfType).append(" %self");
+            for (Map.Entry<String, String> param : params.entrySet()) {
+                paramStr.append(", ").append(param.getValue()).append(" %").append(param.getKey());
+            }
+
+            emit("");
+            emit("define void @" + llvmName + "(" + paramStr + ") {");
+            emit("entry:");
+
+            isGlobalScope = false;
+            pushScope();
+
+            // define self as local variable
+            emit("  %self.addr = alloca " + selfType);
+            emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
+            defineVar("self", "%self.addr");
+            varTypes.put("self", selfType);
+
+            // define parameters as local variables
+            for (Map.Entry<String, String> param : params.entrySet()) {
+                String paramName = param.getKey();
+                String paramType = param.getValue();
+                emit("  %" + paramName + ".addr = alloca " + paramType);
+                emit("  store " + paramType + " %" + paramName + ", " + paramType + "* %" + paramName + ".addr");
+                defineVar(paramName, "%" + paramName + ".addr");
+                varTypes.put(paramName, paramType);
+            }
+
+            // visit constructor body
+            visit(ctx.block());
+
+            emit("  ret void");
+            emit("}");
+
+            popScope();
+            isGlobalScope = true;
+        }
+        return null;
+    }
+
+    @Override
+    public String visitDestructorDeclaration(delphiParser.DestructorDeclarationContext ctx) {
+        String fullName = ctx.scopedIdentifier().getText();
+        if (fullName.contains(".")) {
+            String[] parts = fullName.split("\\.");
+            String className = parts[0];
+            String destructorName = parts[1];
+            
+            ClassInfo classInfo = classes.get(className.toLowerCase());
+            if (classInfo == null) throw new RuntimeException("[LLVM] Unknown class: " + className);
+
+            ProcedureInfo destructorInfo = new ProcedureInfo();
+            destructorInfo.name = destructorName;
+            destructorInfo.ownerClass = className;
+            procedures.put((className + "." + destructorName).toLowerCase(), destructorInfo);
+
+            String selfType = "%" + classInfo.name + "*";
+            String llvmName = className + "_" + destructorName;
+
+            emit("");
+            emit("define void @" + llvmName + "(" + selfType + " %self) {");
+            emit("entry:");
+
+            isGlobalScope = false;
+            pushScope();
+
+            // define self as local variable
+            emit("  %self.addr = alloca " + selfType);
+            emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
+            defineVar("self", "%self.addr");
+            varTypes.put("self", selfType);
+
+            // visit destructor body
+            visit(ctx.block());
+
+            emit("  ret void");
+            emit("}");
+
+            popScope();
+            isGlobalScope = true;
+        }
+        return null;
+    }
+
+    @Override
     public String visitAssignmentStatement(delphiParser.AssignmentStatementContext ctx) {
         String varName = ctx.variable().getText().toLowerCase();
         
@@ -436,31 +943,82 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
     @Override
     public String visitObjectInstantiation(delphiParser.ObjectInstantiationContext ctx) {
         String className = ctx.identifier(0).getText();
-        ClassInfo info = classes.get(className.toLowerCase());
-        if (info == null) throw new RuntimeException("[LLVM] Unknown class: " + className);
+        String methodName = ctx.identifier(1) != null ? ctx.identifier(1).getText() : "Init";
 
+        ClassInfo info = classes.get(className.toLowerCase());
+
+        // not a known class, could be an instance variable calling a method
+        if (info == null) {
+            String objectName = className.toLowerCase();
+            String varClassName = varClassTypes.get(objectName);
+            if (varClassName == null) throw new RuntimeException("[LLVM] Unknown class or object: " + className);
+
+            ClassInfo classInfo = classes.get(varClassName.toLowerCase());
+            if (classInfo == null) throw new RuntimeException("[LLVM] Unknown class: " + varClassName);
+
+            // check procedures first then functions
+            ProcedureInfo procInfo = procedures.get((varClassName + "." + methodName).toLowerCase());
+            FunctionInfo funcInfo = functions.get((varClassName + "." + methodName).toLowerCase());
+
+            String objectLoc = lookupVar(objectName);
+            String selfReg = newTemp();
+            String selfType = "%" + classInfo.name + "*";
+            emit("  " + selfReg + " = load " + selfType + ", " + selfType + "* " + objectLoc);
+            tempTypes.put(selfReg, selfType);
+
+            StringBuilder args = new StringBuilder();
+            args.append(selfType).append(" ").append(selfReg);
+            if (ctx.parameterList() != null) {
+                for (delphiParser.ActualParameterContext param : ctx.parameterList().actualParameter()) {
+                    args.append(", ");
+                    String argReg = visit(param.expression());
+                    String argType = getType(argReg);
+                    args.append(argType).append(" ").append(argReg);
+                }
+            }
+
+            if (funcInfo != null) {
+                // function — return value
+                String result = newTemp();
+                emit("  " + result + " = call " + funcInfo.returnType +
+                    " @" + classInfo.name + "_" + methodName + "(" + args + ")");
+                tempTypes.put(result, funcInfo.returnType);
+                return result;
+            } 
+            else if (procInfo != null) {
+                // procedure — no return value
+                emit("  call void @" + classInfo.name + "_" + methodName + "(" + args + ")");
+                return null;
+            } 
+            else {
+                throw new RuntimeException("[LLVM] Undefined method: " + varClassName + "." + methodName);
+            }
+        }
+
+        // known class — normal object instantiation
         String raw = newTemp();
         String object = newTemp();
         emit("  " + raw + " = call i8* @malloc(i64 " + classSize(info) + ")");
         emit("  " + object + " = bitcast i8* " + raw + " to %" + info.name + "*");
         setType(raw, "i8*");
         setType(object, "%" + info.name + "*");
+        emit("  call void @" + className + "_" + methodName + "(%" + info.name + "* " + object + ")");
         return object;
     }
 
-    @Override
-    public String visitProcedureStatement(delphiParser.ProcedureStatementContext ctx) {
-        String callName = ctx.variable().getText();
-        if (callName.equalsIgnoreCase("WriteLn")) {
-            emitWriteLn(ctx.parameterList());
-            return null;
-        }
-        if (callName.equalsIgnoreCase("ReadLn")) {
-            emitReadLn(ctx.parameterList());
-            return null;
-        }
-        return super.visitProcedureStatement(ctx);
-    }
+    // @Override
+    // public String visitProcedureStatement(delphiParser.ProcedureStatementContext ctx) {
+    //     String callName = ctx.variable().getText();
+    //     if (callName.equalsIgnoreCase("WriteLn")) {
+    //         emitWriteLn(ctx.parameterList());
+    //         return null;
+    //     }
+    //     if (callName.equalsIgnoreCase("ReadLn")) {
+    //         emitReadLn(ctx.parameterList());
+    //         return null;
+    //     }
+    //     return super.visitProcedureStatement(ctx);
+    // }
 
     private void emitWriteLn(delphiParser.ParameterListContext params) {
         if (params == null || params.actualParameter().isEmpty()) return;
