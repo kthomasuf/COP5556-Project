@@ -27,6 +27,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         String parentName;
         List<FieldInfo> fields = new ArrayList<>();
         Map<String, FieldInfo> fieldsByName = new HashMap<>();
+        Map<String, String> methodVisibility = new HashMap<>();
         boolean layoutComplete = false;
     }
 
@@ -289,16 +290,28 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
                 if (section.classMemberList() == null) continue;
 
                 for (delphiParser.ClassMemberContext member : section.classMemberList().classMember()) {
-                    if (member.fieldDeclaration() == null) continue;
-
-                    String llvmType = toLLVMType(member.fieldDeclaration().type_().getText());
-                    for (delphiParser.IdentifierContext id : member.fieldDeclaration().identifierList().identifier()) {
-                        FieldInfo field = new FieldInfo();
-                        field.name = id.getText();
-                        field.llvmType = llvmType;
-                        field.visibility = visibility;
-                        field.declaringClass = className.toLowerCase();
-                        info.fields.add(field);
+                    if (member.fieldDeclaration() != null) {
+                        String llvmType = toLLVMType(member.fieldDeclaration().type_().getText());
+                        for (delphiParser.IdentifierContext id : member.fieldDeclaration().identifierList().identifier()) {
+                            FieldInfo field = new FieldInfo();
+                            field.name = id.getText();
+                            field.llvmType = llvmType;
+                            field.visibility = visibility;
+                            field.declaringClass = className.toLowerCase();
+                            info.fields.add(field);
+                        }
+                    } 
+                    else {
+                        String methodText = member.getText().toLowerCase();
+                        methodText = methodText.replace("procedure", "")
+                                            .replace("function", "")
+                                            .replace("constructor", "")
+                                            .replace("destructor", "")
+                                            .split("\\(")[0]
+                                            .split(":")[0]
+                                            .trim();
+                        info.methodVisibility.put(methodText, visibility);
+                        System.out.println("[LLVM] Method visibility: " + methodText + " = " + visibility);
                     }
                 }
             }
@@ -306,6 +319,21 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
         classes.put(className.toLowerCase(), info);
         return null;
+    }
+
+    private void checkMethodVisibility(String className, String methodName) {
+        ClassInfo classInfo = classes.get(className.toLowerCase());
+        if (classInfo == null) return;
+        
+        String visibility = classInfo.methodVisibility.get(methodName.toLowerCase());
+        if (visibility == null) return;
+        
+        if (visibility.equals("private")) {
+            if (currentClass == null || !currentClass.equalsIgnoreCase(className)) {
+                throw new RuntimeException("[LLVM] Access denied: private method '" 
+                    + methodName + "' on " + className);
+            }
+        }
     }
 
     private void completeClassLayouts() {
@@ -430,6 +458,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         emit("entry:");
 
         isGlobalScope = false;
+        currentClass = procInfo.ownerClass;
         pushScope();
 
         // if procedure is a part of class add self as a local variable
@@ -461,6 +490,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
         popScope();
         isGlobalScope = true;
+        currentClass = null;
 
         return null;
     }
@@ -525,6 +555,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
                 }
             }
 
+            checkMethodVisibility(className, methodName);
             emit("  call void @" + originalClassName + "_" + procInfo.name + "(" + args + ")");
             return null;
         }
@@ -532,6 +563,20 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         // get user defined procedure
         ProcedureInfo procInfo = procedures.get(callName);
         if (procInfo == null) {
+            if (currentClass != null) {
+                String mapKey = (currentClass + "." + callName).toLowerCase();
+                ProcedureInfo classProc = procedures.get(mapKey);
+                if (classProc != null) {
+                    String selfLoc = lookupVar("self");
+                    String originalClassName = classes.get(currentClass.toLowerCase()).name;
+                    String selfType = "%" + originalClassName + "*";
+                    String selfReg = newTemp();
+                    emit("  " + selfReg + " = load " + selfType + ", " + selfType + "* " + selfLoc);
+                    tempTypes.put(selfReg, selfType);
+                    emit("  call void @" + originalClassName + "_" + classProc.name + "(" + selfType + " " + selfReg + ")");
+                    return null;
+                }
+            }
             throw new RuntimeException("[LLVM] Undefined procedure: " + callName);
         }
 
@@ -705,6 +750,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             }
 
             String result = newTemp();
+            checkMethodVisibility(className, methodName);
             emit("  " + result + " = call " + funcInfo.returnType + " @" + className + "_" + methodName + "(" + args + ")");
             tempTypes.put(result, funcInfo.returnType);
             
@@ -714,6 +760,45 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         // get user defined procedure
         FunctionInfo funcInfo = functions.get(callName);
         if (funcInfo == null) {
+            if (currentClass != null) {
+                String mapKey = (currentClass + "." + callName).toLowerCase();
+                FunctionInfo classFunc = functions.get(mapKey);
+                if (classFunc != null) {
+                    ClassInfo classInfo = classes.get(currentClass.toLowerCase());
+                    if (classInfo != null) {
+                        String vis = classInfo.methodVisibility.get(callName.toLowerCase());
+                        if (vis != null && vis.equals("private") &&
+                            !currentClass.equalsIgnoreCase(classFunc.ownerClass)) {
+                            throw new RuntimeException("[LLVM] Access denied: private method '" + callName + "'");
+                        }
+                    }
+
+                    String selfLoc = lookupVar("self");
+                    String originalClassName = classes.get(currentClass.toLowerCase()).name;
+                    String selfType = "%" + originalClassName + "*";
+                    String selfReg = newTemp();
+                    emit("  " + selfReg + " = load " + selfType + ", " + selfType + "* " + selfLoc);
+                    tempTypes.put(selfReg, selfType);
+
+                    StringBuilder args = new StringBuilder();
+                    args.append(selfType).append(" ").append(selfReg);
+                    if (ctx.parameterList() != null) {
+                        for (delphiParser.ActualParameterContext param : ctx.parameterList().actualParameter()) {
+                            args.append(", ");
+                            String argReg = visit(param.expression());
+                            String argType = getType(argReg);
+                            args.append(argType).append(" ").append(argReg);
+                        }
+                    }
+
+                    String result = newTemp();
+                    emit("  " + result + " = call " + classFunc.returnType +
+                        " @" + originalClassName + "_" + classFunc.name +
+                        "(" + args + ")");
+                    tempTypes.put(result, classFunc.returnType);
+                    return result;
+                }
+            }
             throw new RuntimeException("[LLVM] Undefined function: " + callName);
         }
 
@@ -976,6 +1061,8 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
                     args.append(argType).append(" ").append(argReg);
                 }
             }
+            
+            checkMethodVisibility(varClassName, methodName);
 
             if (funcInfo != null) {
                 // function — return value
