@@ -941,6 +941,15 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             // visit destructor body
             visit(ctx.block());
 
+            String selfReg = newTemp();
+            emit("  " + selfReg + " = load " + selfType + ", " + selfType + "* %self.addr");
+            tempTypes.put(selfReg, selfType);
+
+            String rawSelf = newTemp();
+            emit("  " + rawSelf + " = bitcast " + selfType + " " + selfReg + " to i8*");
+            tempTypes.put(rawSelf, "i8*");
+            emit("  call void @free(i8* " + rawSelf + ")");
+
             emit("  ret void");
             emit("}");
 

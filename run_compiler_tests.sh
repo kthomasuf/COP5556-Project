@@ -128,6 +128,17 @@ test_input() {
     esac
 }
 
+extra_ir_check() {
+    case "$1" in
+        class_destructor)
+            grep -q "call void @free(i8\\*" output.ll
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
 printf "\n========================================\n"
 printf "    LLVM Compiler Test Suite\n"
 printf "========================================\n\n"
@@ -164,6 +175,12 @@ for test_file in $(find tests/compiler -maxdepth 1 -name '*.pas' | sort); do
     if [[ $? -ne 0 ]]; then
         printf "  %-30s ${RED}FAIL${NC}   (--compile failed)\n" "$name"
         sed 's/^/    /' /tmp/compiler_test_compile.log
+        FAIL=$((FAIL+1))
+        continue
+    fi
+
+    if ! extra_ir_check "$name"; then
+        printf "  %-30s ${RED}FAIL${NC}   (missing expected ir pattern)\n" "$name"
         FAIL=$((FAIL+1))
         continue
     fi
