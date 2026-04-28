@@ -43,6 +43,23 @@ Modify test1.pas to execute different test files (ex. test2.pas)
 java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/test1.pas
 ```
 
+### Run LLVM Compile Mode
+
+Generate LLVM IR for a Pascal/Delphi source file:
+
+```bash
+java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/compiler/core_arithmetic_io.pas --compile
+```
+
+This writes LLVM IR to `output.ll`.
+
+To compile the generated IR to a native executable:
+
+```bash
+clang output.ll -o output
+./output
+```
+
 ## Automated Test Runner
 
 A bash-based automated test runner is included.
@@ -64,6 +81,65 @@ Expected-failure tests currently include:
 - test7 (private method access violation)
 - test24 (BREAK outside loop)
 - test25 (CONTINUE outside loop)
+
+## LLVM Compiler Test Runner
+
+A separate automated runner is included for LLVM compile mode:
+
+```bash
+bash run_compiler_tests.sh
+```
+
+This runner compiles the Java sources, generates LLVM IR for each compiler-focused Pascal test, validates the IR with `clang`, runs the native executable, and reports PASS, FAIL, and XFAIL results.
+
+Current compiler coverage includes:
+
+- primitive values and assignments
+- arithmetic, comparison, and boolean expressions
+- `WriteLn` and `ReadLn`
+- `if/else`, `while`, `for`, `break`, `continue`
+- global procedures and functions
+- class fields, methods, constructors, destructors
+- private field/method access checks
+
+## LLVM Compiler Support Summary
+
+The LLVM backend currently supports a substantial subset of the Project 2 language, including:
+
+- `INTEGER`, `REAL`, `BOOLEAN`
+- variable declarations and assignments
+- arithmetic/comparison/boolean expressions
+- `WriteLn` / `ReadLn`
+- `if/else`
+- `while`
+- `for`
+- `break` / `continue`
+- global procedures/functions
+- classes, objects, constructors, destructors
+- private/public enforcement for fields and methods
+- inherited field layout
+
+The interpreter remains the broader reference implementation, while the LLVM backend focuses on the chosen compiler subset required by the project.
+
+## WebAssembly Extra Credit
+
+A small WebAssembly demo path is included for the LLVM backend:
+
+- Pascal source: `tests/compiler/wasm_export_demo.pas`
+- browser files: `wasm/index.html` and `wasm/runtime.js`
+- build helper: `build_wasm_demo.sh`
+
+Build the demo object/module with:
+
+```bash
+bash build_wasm_demo.sh
+```
+
+Notes:
+
+- The script always generates a WebAssembly object file (`wasm/demo.o`) using `llc`.
+- If `wasm-ld` is available, it also links a browser-loadable `wasm/demo.wasm`.
+- In the current local environment, `llc` is installed but `wasm-ld` is not, so final `.wasm` linking may require installing the LLVM linker tools.
 
 ## Test File Explainations
 
