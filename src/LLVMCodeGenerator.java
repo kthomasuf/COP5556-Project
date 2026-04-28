@@ -65,6 +65,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
     private Map<String, ClassInfo> classes = new HashMap<>();
 
     private Map<String, ProcedureInfo> procedures = new HashMap<>();
+    private Map<String, ProcedureInfo> constructors = new HashMap<>();
     private Map<String, FunctionInfo> functions = new HashMap<>();
 
     // Helper Methods
@@ -470,6 +471,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
                 emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
                 defineVar("self", "%self.addr");
                 varTypes.put("self", selfType);
+                varClassTypes.put("self", procInfo.ownerClass.toLowerCase());
             }
         }
 
@@ -671,9 +673,11 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
                 emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
                 defineVar("self", "%self.addr");
                 varTypes.put("self", selfType);
+                varClassTypes.put("self", funcInfo.ownerClass.toLowerCase());
             }
         }
 
+        currentClass = funcInfo.ownerClass;
         currentFunctionName = funcInfo.name.toLowerCase();
         currentFunctionReturnType = llvmReturnType;
 
@@ -702,6 +706,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
         popScope();
         isGlobalScope = true;
+        currentClass = null;
 
         currentFunctionName = null;
         currentFunctionReturnType = null;
@@ -837,6 +842,10 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             String selfType = "%" + classInfo.name + "*";
             String llvmName = className + "_" + constructorName;
 
+            ProcedureInfo constructorInfo = new ProcedureInfo();
+            constructorInfo.name = constructorName;
+            constructorInfo.ownerClass = className;
+
             // collect parameters, needs own map since does use procedure infastructure
             LinkedHashMap<String, String> params = new LinkedHashMap<>();
             if (ctx.formalParameterList() != null) {
@@ -844,9 +853,12 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
                     String paramType = toLLVMType(section.parameterGroup().typeIdentifier().getText().toLowerCase());
                     for (delphiParser.IdentifierContext id : section.parameterGroup().identifierList().identifier()) {
                         params.put(id.getText().toLowerCase(), paramType);
+                        constructorInfo.params.put(id.getText().toLowerCase(), paramType);
                     }
                 }
             }
+
+            constructors.put((className + "." + constructorName).toLowerCase(), constructorInfo);
 
             StringBuilder paramStr = new StringBuilder();
             paramStr.append(selfType).append(" %self");
@@ -859,6 +871,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             emit("entry:");
 
             isGlobalScope = false;
+            currentClass = className;
             pushScope();
 
             // define self as local variable
@@ -866,6 +879,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
             defineVar("self", "%self.addr");
             varTypes.put("self", selfType);
+            varClassTypes.put("self", className.toLowerCase());
 
             // define parameters as local variables
             for (Map.Entry<String, String> param : params.entrySet()) {
@@ -885,6 +899,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
             popScope();
             isGlobalScope = true;
+            currentClass = null;
         }
         return null;
     }
@@ -913,6 +928,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             emit("entry:");
 
             isGlobalScope = false;
+            currentClass = className;
             pushScope();
 
             // define self as local variable
@@ -920,6 +936,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
             emit("  store " + selfType + " %self, " + selfType + "* %self.addr");
             defineVar("self", "%self.addr");
             varTypes.put("self", selfType);
+            varClassTypes.put("self", className.toLowerCase());
 
             // visit destructor body
             visit(ctx.block());
@@ -929,6 +946,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
             popScope();
             isGlobalScope = true;
+            currentClass = null;
         }
         return null;
     }
@@ -1021,7 +1039,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
     private void checkFieldAccess(FieldInfo field, String targetClassName) {
         if (!field.visibility.equals("private")) return;
-        if (currentClass != null && currentClass.equals(field.declaringClass)) return;
+        if (currentClass != null && currentClass.equalsIgnoreCase(field.declaringClass)) return;
         throw new RuntimeException("[LLVM] Access denied: private field '" + field.name + "' on " + targetClassName);
     }
 
@@ -1089,7 +1107,21 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
         emit("  " + object + " = bitcast i8* " + raw + " to %" + info.name + "*");
         setType(raw, "i8*");
         setType(object, "%" + info.name + "*");
-        emit("  call void @" + className + "_" + methodName + "(%" + info.name + "* " + object + ")");
+
+        ProcedureInfo constructorInfo = constructors.get((className + "." + methodName).toLowerCase());
+        if (constructorInfo != null) {
+            StringBuilder args = new StringBuilder();
+            args.append("%").append(info.name).append("* ").append(object);
+            if (ctx.parameterList() != null) {
+                for (delphiParser.ActualParameterContext param : ctx.parameterList().actualParameter()) {
+                    args.append(", ");
+                    String argReg = visit(param.expression());
+                    String argType = getType(argReg);
+                    args.append(argType).append(" ").append(argReg);
+                }
+            }
+            emit("  call void @" + className + "_" + methodName + "(" + args + ")");
+        }
         return object;
     }
 

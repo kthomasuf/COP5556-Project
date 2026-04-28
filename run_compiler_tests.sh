@@ -70,6 +70,9 @@ expected_output() {
         class_public_field)
             printf "42"
             ;;
+        class_self_field)
+            printf "6"
+            ;;
         class_inherited_fields)
             printf "12"
             ;;
