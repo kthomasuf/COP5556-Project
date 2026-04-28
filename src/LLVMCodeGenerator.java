@@ -756,7 +756,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
             String result = newTemp();
             checkMethodVisibility(className, methodName);
-            emit("  " + result + " = call " + funcInfo.returnType + " @" + className + "_" + methodName + "(" + args + ")");
+            emit("  " + result + " = call " + funcInfo.returnType + " @" + funcInfo.ownerClass + "_" + funcInfo.name + "(" + args + ")");
             tempTypes.put(result, funcInfo.returnType);
             
             return result;
@@ -822,7 +822,7 @@ public class LLVMCodeGenerator extends delphiBaseVisitor<String> {
 
         // store result in temp register
         String result = newTemp();
-        emit("  " + result + " = call " + funcInfo.returnType + " @" + callName + "(" + args + ")");
+        emit("  " + result + " = call " + funcInfo.returnType + " @" + funcInfo.name + "(" + args + ")");
         tempTypes.put(result, funcInfo.returnType);
 
         return result;

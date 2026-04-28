@@ -48,7 +48,12 @@ COMPILE_SOURCES=(
     src/my/delphi/*.java
 )
 
-XFAIL_TESTS=(class_private_field_rejected)
+XFAIL_TESTS=(
+    class_private_field_rejected
+    class_visibility_fail1
+    class_visibility_fail2
+    error
+)
 
 contains() {
     local needle="$1"
@@ -76,6 +81,21 @@ expected_output() {
         class_inherited_fields)
             printf "12"
             ;;
+        class_constructor)
+            printf "2"
+            ;;
+        class_destructor)
+            printf "1\n2"
+            ;;
+        class_methods)
+            printf "104\n3"
+            ;;
+        class_visibility_pass1)
+            printf "0\n1"
+            ;;
+        class_visibility_pass2)
+            printf "5"
+            ;;
         control_break_continue)
             printf "8"
             ;;
@@ -88,6 +108,12 @@ expected_output() {
         control_while_loop)
             printf "10"
             ;;
+        global_procedures)
+            printf "5"
+            ;;
+        global_functions)
+            printf "10\n5"
+            ;;
     esac
 }
 
@@ -95,6 +121,9 @@ test_input() {
     case "$1" in
         readln_integer)
             printf "41\n"
+            ;;
+        class_methods)
+            printf "7\n3\n"
             ;;
     esac
 }

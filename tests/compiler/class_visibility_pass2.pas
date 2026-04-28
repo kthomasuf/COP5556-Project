@@ -31,4 +31,5 @@ END;
 BEGIN
   Bond := TSecretAgent.Init();
   Bond.DoMission();
+  WriteLn(Result);
 END.

@@ -24,4 +24,5 @@ END;
 BEGIN
   Player := THero.Init(); 
   Player.LevelWorld();
+  WriteLn(WorldLevel);
 END.

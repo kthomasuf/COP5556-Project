@@ -37,4 +37,6 @@ BEGIN
   MyAccount.Deposit(UserInput);
   ReadLn(UserInput);
   Cash := MyAccount.Withdraw(UserInput);
+  WriteLn(Balance);
+  WriteLn(Cash);
 END.
