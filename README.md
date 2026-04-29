@@ -1,4 +1,4 @@
-# COP5556 - Project #2
+# COP5556 - Final Project
 
 ## Team Members
 Shriyans Arkal (UFID: 52069214)  
