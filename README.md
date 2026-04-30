@@ -1,17 +1,20 @@
-# COP5556 Project 2
+# COP5556 - Final Project
 
 ## Team Members
+Shriyans Arkal (UFID: 52069214)  
+Kenneth Thomas (UFID: 47801757)
 
-- Shriyans Arkal (UFID: 52069214)
-- Kenneth Thomas (UFID: 47801757)
+## LLVM Video Demonstrations:
+General LLVM Compiler Demo: https://youtu.be/AFiSdxOjaMo
+WebAssembly Browser Demo: https://youtu.be/TUbR1hKPc1A
 
-## Project Summary
+## What is working?
 
-This project includes:
+For the first project milestone, our interpreter implementation and grammar additions successfully add functionality for classes, objects, constructors, destructors, and encapsulation to the predefined language. Class inheritance and related functionality was also implemented.
 
-- a Pascal/Delphi interpreter
-- an LLVM IR compiler backend
-- a WebAssembly browser demo for the extra credit portion
+For the second project milestone, we were able to succesfully implement while-do and for-do loops, break and continue keywords, user defined procedures and functions, as well update our language to use static scoping. In total we created 21 test files to showcase our implementation and demonstrate the parts of the language we added. Additional test files were added for automation and edge coverage (tests 22 through 26).
+
+For the final project, we were able to implement an LLVM IR compiler that converted our testcases to accurate LLVM intermediate representation code. In terms of features we were able to successfully add classes, procedures, functions, general artihmetic, control flow features related to for loops, while loops, if-else statements, break, etc.
 
 ANTLR is included in `lib/antlr-4.13.2-complete.jar`.
 
