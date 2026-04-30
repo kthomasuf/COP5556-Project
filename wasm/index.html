@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLVM WASM Feature Showcase</title>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      color: #000000;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 40px auto 72px;
+      padding: 0 20px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
+
+    .intro {
+      margin: 0;
+      max-width: 720px;
+      line-height: 1.55;
+      color: #000000;
+    }
+
+    .status {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border: 1px solid #000000;
+      border-radius: 0;
+      background: #ffffff;
+      font-family: Menlo, Monaco, monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 22px;
+    }
+
+    .tile {
+      background: #ffffff;
+      border: 1px solid #000000;
+      border-radius: 0;
+      padding: 18px;
+    }
+
+    .tile h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .tile p {
+      margin: 0;
+      color: #000000;
+      line-height: 1.45;
+      min-height: 42px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+      align-items: end;
+    }
+
+    .field-grid.single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #000000;
+    }
+
+    input {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #000000;
+      border-radius: 0;
+      font-size: 15px;
+      background: #ffffff;
+      color: #000000;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #000000;
+      border-radius: 0;
+      background: #000000;
+      color: #ffffff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #ffffff;
+      color: #8a8a8a;
+      border-color: #8a8a8a;
+      cursor: not-allowed;
+    }
+
+    .result {
+      min-height: 22px;
+      font-family: Menlo, Monaco, monospace;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #000000;
+      overflow-wrap: anywhere;
+    }
+
+    .tile code {
+      padding: 1px 4px;
+      border: 1px solid #000000;
+      border-radius: 0;
+      background: #ffffff;
+      color: #000000;
+      font-size: 12px;
+    }
+
+    .export-list {
+      margin-top: 24px;
+      padding: 18px;
+      border: 1px solid #000000;
+      border-radius: 0;
+      background: #ffffff;
+    }
+
+    .export-list h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .export-list code {
+      display: inline-block;
+      margin: 0 10px 10px 0;
+      padding: 6px 8px;
+      border-radius: 0;
+      background: #ffffff;
+      color: #000000;
+      border: 1px solid #000000;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>LLVM WASM Feature Showcase</h1>
+    <p class="intro">
+      This page loads a Pascal-to-LLVM-to-WebAssembly module and calls exported functions that cover arithmetic,
+      conditionals, loops, and class methods.
+    </p>
+
+    <div id="status" class="status">loading module...</div>
+
+    <section class="grid">
+      <article class="tile">
+        <h2>AddOne</h2>
+        <p>Simple arithmetic function.</p>
+        <div class="controls">
+          <div class="field-grid single">
+            <div class="field">
+              <label for="addone-value">Value</label>
+              <input id="addone-value" type="number" value="41">
+            </div>
+          </div>
+          <button id="addone-run" disabled>Run</button>
+          <div id="addone-result" class="result"></div>
+        </div>
+      </article>
+
+      <article class="tile">
+        <h2>MaxValue</h2>
+        <p>Branching with <code>if/else</code>.</p>
+        <div class="controls">
+          <div class="field-grid">
+            <div class="field">
+              <label for="max-left">Left</label>
+              <input id="max-left" type="number" value="7">
+            </div>
+            <div class="field">
+              <label for="max-right">Right</label>
+              <input id="max-right" type="number" value="12">
+            </div>
+          </div>
+          <button id="max-run" disabled>Run</button>
+          <div id="max-result" class="result"></div>
+        </div>
+      </article>
+
+      <article class="tile">
+        <h2>SumToN</h2>
+        <p>Looping with <code>while</code>.</p>
+        <div class="controls">
+          <div class="field-grid single">
+            <div class="field">
+              <label for="sum-limit">Limit</label>
+              <input id="sum-limit" type="number" value="5">
+            </div>
+          </div>
+          <button id="sum-run" disabled>Run</button>
+          <div id="sum-result" class="result"></div>
+        </div>
+      </article>
+
+      <article class="tile">
+        <h2>CounterDemo</h2>
+        <p>Class allocation, constructor, method call, and function return.</p>
+        <div class="controls">
+          <div class="field-grid">
+            <div class="field">
+              <label for="counter-start">Start</label>
+              <input id="counter-start" type="number" value="5">
+            </div>
+            <div class="field">
+              <label for="counter-step">Step</label>
+              <input id="counter-step" type="number" value="3">
+            </div>
+          </div>
+          <button id="counter-run" disabled>Run</button>
+          <div id="counter-result" class="result"></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="export-list">
+      <h2>Module Exports</h2>
+      <div id="exports"></div>
+    </section>
+  </main>
+
+  <script type="module" src="./runtime.js"></script>
+</body>
+</html>
