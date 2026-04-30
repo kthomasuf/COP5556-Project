@@ -294,6 +294,3 @@ http://127.0.0.1:8000/wasm/
 - `wasm/demo.o` - WebAssembly object file produced by `llc`
 - `wasm/demo.wasm` - final linked WebAssembly module used by the browser
 
-## Video Demonstration
-
-Include the browser-execution video link in your submission comments.
