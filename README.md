@@ -1,171 +1,295 @@
-# COP5556 - Project #2
+# COP5556 Project 2
 
 ## Team Members
-Shriyans Arkal (UFID: 52069214)  
-Kenneth Thomas (UFID: 47801757)
 
-## What is working?
+- Shriyans Arkal (UFID: 52069214)
+- Kenneth Thomas (UFID: 47801757)
 
-For the first project milestone, our interpreter implementation and grammar additions successfully add functionality for classes, objects, constructors, destructors, and encapsulation to the predefined language. Class inheritance and related functionality was also implemented.
+## Project Summary
 
-For the second project milestone, we were able to succesfully implement while-do and for-do loops, break and continue keywords, user defined procedures and functions, as well update our language to use static scoping.
+This project includes:
 
-In total we created 21 test files to showcase our implementation and demonstrate the parts of the language we added.
+- a Pascal/Delphi interpreter
+- an LLVM IR compiler backend
+- a WebAssembly browser demo for the extra credit portion
 
-Additional test files were added for automation and edge coverage (tests 22 through 26).
+ANTLR is included in `lib/antlr-4.13.2-complete.jar`.
 
-## Explanation of Implementation
+## Prerequisites
 
-In order to add the previously listed functionality to the predefined language, several additions were added to the language grammar. Specifically, classes were added as a possible unpackedStructuredType with their accompanying grammar definitions, as well objects were able to be instantiated by adding grammar definitions to the predefined factor definitions. Apart from changes to the grammar we implemented a java interpreter that is able to navigate the abstract syntax tree and provide object oriented programming support that allows classes, objects, etc. to be defined and tested.
+Make sure these tools are installed and available on your `PATH`:
 
-Further updates to the predefined langauge allowed us to implement loops, keywords, and allow users to define their own procedures and functions. Moreover, changes to our interpreter allowed us to add static scoping to the language.
+- `java`
+- `javac`
+- `clang`
+- `llc`
+- `wasm-ld`
 
-## Commands To Run Our Implementation
-To avoid potential complications, please fun the following commands from the project root directory.
+## Compiler
 
-### Generate Lexer and Parser
+### Build The Compiler
+
+After downloading or unzipping the full project, open a terminal in the project root and run:
 
 ```bash
 java -jar lib/antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.delphi -o src/my/delphi grammar/delphi.g4
 ```
 
-### Compile Interpreter Code
-
 ```bash
-javac -cp .:lib/antlr-4.13.2-complete.jar src/Main.java src/Value.java src/Instance.java src/Environment.java src/ClassSymbol.java src/BreakException.java src/ContinueException.java src/ProcedureSymbol.java src/FunctionSymbol.java src/DelphiInterpreter.java src/LLVMCodeGenerator.java src/my/delphi/*.java
+javac -cp .:lib/antlr-4.13.2-complete.jar \
+    src/Main.java \
+    src/Value.java \
+    src/Instance.java \
+    src/Environment.java \
+    src/ClassSymbol.java \
+    src/BreakException.java \
+    src/ContinueException.java \
+    src/ProcedureSymbol.java \
+    src/FunctionSymbol.java \
+    src/DelphiInterpreter.java \
+    src/LLVMCodeGenerator.java \
+    src/my/delphi/*.java
 ```
 
-### Run The Interpreter
+### Run The Compiler Manually
 
-Modify test1.pas to execute different test files (ex. test2.pas)
-
-```bash
-java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/test1.pas
-```
-
-### Run LLVM Compile Mode
-
-Generate LLVM IR for a Pascal/Delphi source file:
+Generate LLVM IR for a compiler test file:
 
 ```bash
 java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/compiler/core_arithmetic_io.pas --compile
 ```
 
-This writes LLVM IR to `output.ll`.
+This writes the generated LLVM IR to:
 
-To compile the generated IR to a native executable:
+```text
+output.ll
+```
+
+To validate and run the generated native output:
 
 ```bash
 clang output.ll -o output
 ./output
 ```
 
-## Automated Test Runner
+### Run The Compiler Test Suite
 
-A bash-based automated test runner is included.
-
-```bash
-bash run_tests.sh
-```
-
-The runner compares expected outputs in tests/expected against actual outputs and reports PASS, FAIL, XFAIL, and SKIP.
-
-Interactive ReadLn tests are also automated using simulated input values:
-
-- test8 uses input 42
-- test12 uses input 250
-
-Expected-failure tests currently include:
-
-- test6 (private field access violation)
-- test7 (private method access violation)
-- test24 (BREAK outside loop)
-- test25 (CONTINUE outside loop)
-
-## LLVM Compiler Test Runner
-
-A separate automated runner is included for LLVM compile mode:
+Use the automated compiler runner:
 
 ```bash
 bash run_compiler_tests.sh
 ```
 
-This runner compiles the Java sources, generates LLVM IR for each compiler-focused Pascal test, validates the IR with `clang`, runs the native executable, and reports PASS, FAIL, and XFAIL results.
+This:
 
-Current compiler coverage includes:
+1. compiles the Java sources
+2. generates LLVM IR for each compiler-focused Pascal file
+3. validates the IR with `clang`
+4. runs the resulting native executable
+5. reports `PASS`, `FAIL`, and `XFAIL`
 
-- primitive values and assignments
-- arithmetic, comparison, and boolean expressions
-- `WriteLn` and `ReadLn`
-- `if/else`, `while`, `for`, `break`, `continue`
-- global procedures and functions
-- class fields, methods, constructors, destructors
-- private field/method access checks
+### Saved `.ll` Files For Compiler Test Cases
 
-## LLVM Compiler Support Summary
+Saved LLVM IR files for the compiler test cases are included in:
 
-The LLVM backend currently supports a substantial subset of the Project 2 language, including:
+```text
+tests/compiler/ll/
+```
 
-- `INTEGER`, `REAL`, `BOOLEAN`
-- variable declarations and assignments
-- arithmetic/comparison/boolean expressions
-- `WriteLn` / `ReadLn`
-- `if/else`
-- `while`
-- `for`
-- `break` / `continue`
-- global procedures/functions
-- classes, objects, constructors, destructors
-- private/public enforcement for fields and methods
-- inherited field layout
+Expected-failure compiler tests include small placeholder `.ll` files explaining that those sources intentionally fail during compilation/code generation.
 
-The interpreter remains the broader reference implementation, while the LLVM backend focuses on the chosen compiler subset required by the project.
+### Manual Fallback For Compiler Testing
+
+If `run_compiler_tests.sh` does not work in your environment, use the manual flow:
+
+```bash
+java -jar lib/antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.delphi -o src/my/delphi grammar/delphi.g4
+```
+
+```bash
+javac -cp .:lib/antlr-4.13.2-complete.jar \
+    src/Main.java \
+    src/Value.java \
+    src/Instance.java \
+    src/Environment.java \
+    src/ClassSymbol.java \
+    src/BreakException.java \
+    src/ContinueException.java \
+    src/ProcedureSymbol.java \
+    src/FunctionSymbol.java \
+    src/DelphiInterpreter.java \
+    src/LLVMCodeGenerator.java \
+    src/my/delphi/*.java
+```
+
+```bash
+java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/compiler/core_arithmetic_io.pas --compile
+clang output.ll -o output
+./output
+```
+
+Replace `tests/compiler/core_arithmetic_io.pas` with any supported compiler test file.
+
+## Interpreter
+
+### Build The Interpreter
+
+The interpreter uses the same generated parser and compiled Java sources as the compiler, so the same build commands apply:
+
+```bash
+java -jar lib/antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.delphi -o src/my/delphi grammar/delphi.g4
+```
+
+```bash
+javac -cp .:lib/antlr-4.13.2-complete.jar \
+    src/Main.java \
+    src/Value.java \
+    src/Instance.java \
+    src/Environment.java \
+    src/ClassSymbol.java \
+    src/BreakException.java \
+    src/ContinueException.java \
+    src/ProcedureSymbol.java \
+    src/FunctionSymbol.java \
+    src/DelphiInterpreter.java \
+    src/LLVMCodeGenerator.java \
+    src/my/delphi/*.java
+```
+
+### Run The Interpreter Manually
+
+Run a test file through the interpreter:
+
+```bash
+java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/test1.pas
+```
+
+### Run The Interpreter Test Suite
+
+Use the automated interpreter runner:
+
+```bash
+bash run_tests.sh
+```
+
+This compares expected output files against interpreter output and reports `PASS`, `FAIL`, `XFAIL`, and `SKIP`.
+
+### Manual Fallback For Interpreter Testing
+
+If `run_tests.sh` does not work in your environment, use the manual flow:
+
+```bash
+java -jar lib/antlr-4.13.2-complete.jar -Dlanguage=Java -visitor -package my.delphi -o src/my/delphi grammar/delphi.g4
+```
+
+```bash
+javac -cp .:lib/antlr-4.13.2-complete.jar \
+    src/Main.java \
+    src/Value.java \
+    src/Instance.java \
+    src/Environment.java \
+    src/ClassSymbol.java \
+    src/BreakException.java \
+    src/ContinueException.java \
+    src/ProcedureSymbol.java \
+    src/FunctionSymbol.java \
+    src/DelphiInterpreter.java \
+    src/LLVMCodeGenerator.java \
+    src/my/delphi/*.java
+```
+
+```bash
+java -cp ./src:lib/antlr-4.13.2-complete.jar Main tests/test1.pas
+```
+
+Replace `tests/test1.pas` with any interpreter test file you want to run.
 
 ## WebAssembly Extra Credit
 
-A small WebAssembly demo path is included for the LLVM backend:
+The WebAssembly demo files are in:
 
-- Pascal source: `tests/compiler/wasm_export_demo.pas`
-- browser files: `wasm/index.html` and `wasm/runtime.js`
-- build helper: `build_wasm_demo.sh`
+```text
+wasm/wasm_export_demo.pas
+wasm/index.html
+wasm/runtime.js
+wasm/README.md
+```
 
-Build the demo object/module with:
+The current showcase exports:
+
+- `AddOne`
+- `MaxValue`
+- `SumToN`
+- `CounterDemo`
+
+The full WASM-specific instructions are also documented in:
+
+```text
+wasm/README.md
+```
+
+### Build The WASM Demo
+
+Use the helper script:
 
 ```bash
 bash build_wasm_demo.sh
 ```
 
-Notes:
+Run that command from the downloaded project root directory, not from inside `wasm/`.
 
-- The script always generates a WebAssembly object file (`wasm/demo.o`) using `llc`.
-- If `wasm-ld` is available, it also links a browser-loadable `wasm/demo.wasm`.
-- In the current local environment, `llc` is installed but `wasm-ld` is not, so final `.wasm` linking may require installing the LLVM linker tools.
+The script also saves the LLVM IR used for the WASM demo in:
 
-## Test File Explainations
+```text
+wasm/output.ll
+```
 
-test1.pas -> Tests Object Oriented Programming Functionality  
-test2.pas -> Tests Object Oriented Programming Functionality  
-test3.pas -> Tests Arithmetic Logic  
-test4.pas -> Tests Comparison Logic  
-test5.pas -> Tests Destructor  
-test6.pas -> Tests Encapsulation  
-test7.pas -> Tests Encapsulation  
-test8.pas -> Tests User Input Functionality  
-test9.pas -> Tests Inheritance  
-test10.pas -> Tests Inheritance w/ Encapsulation  
-test11.pas -> Tests All Functionality  
-test12.pas -> Tests Object Oriented Programming w/ User Input  
-test13.pas -> Tests If-Else statements  
-test14.pas -> Tests While Loop  
-test15.pas -> Tests For Loop  
-test16.pas -> Tests Break Keyword in For Loop  
-test17.pas -> Tests Continue Keyword in For Loop  
-test18.pas -> Tests Break Keyword in While Loop  
-test19.pas -> Tests Continue Keyword in While Loop  
-test20.pas -> Tests Static Scoping for Procedures  
-test21.pas -> Tests Static Scoping for Functions  
-test22.pas -> Tests nested loops with break/continue  
-test23.pas -> Tests for-loop boundary conditions  
-test24.pas -> Tests invalid BREAK outside loop (expected failure)  
-test25.pas -> Tests invalid CONTINUE outside loop (expected failure)  
-test26.pas -> Tests while-loop boundary conditions  
+### Manual Fallback
+
+If `build_wasm_demo.sh` does not work, use the manual flow below from the downloaded project root:
+
+```bash
+java -cp ./src:lib/antlr-4.13.2-complete.jar Main wasm/wasm_export_demo.pas --compile
+```
+
+```bash
+llc -march=wasm32 -filetype=obj output.ll -o wasm/demo.o
+wasm-ld \
+    --no-entry \
+    --export=AddOne \
+    --export=MaxValue \
+    --export=SumToN \
+    --export=CounterDemo \
+    --export=main \
+    --allow-undefined \
+    wasm/demo.o \
+    -o wasm/demo.wasm
+```
+
+```bash
+python3 -m http.server 8000
+```
+
+Start the HTTP server from the downloaded project root directory, not from inside `wasm/`.
+
+That way the browser can load:
+
+- `wasm/index.html`
+- `wasm/runtime.js`
+- `wasm/demo.wasm`
+
+Then open:
+
+```text
+http://127.0.0.1:8000/wasm/
+```
+
+## Important Generated Files
+
+- `output.ll` - generated LLVM IR
+- `wasm/demo.o` - WebAssembly object file produced by `llc`
+- `wasm/demo.wasm` - final linked WebAssembly module used by the browser
+
+## Video Demonstration
+
+Include the browser-execution video link in your submission comments.

@@ -53,9 +53,10 @@ javac -cp ".${SEP}lib/antlr-4.13.2-complete.jar" \
     src/LLVMCodeGenerator.java \
     src/my/delphi/*.java
 
-java -cp "$CP" Main tests/compiler/wasm_export_demo.pas --compile
+java -cp "$CP" Main wasm/wasm_export_demo.pas --compile
+cp output.ll wasm/output.ll
 
-"$LLC_BIN" -march=wasm32 -filetype=obj output.ll -o wasm/demo.o
+"$LLC_BIN" -march=wasm32 -filetype=obj wasm/output.ll -o wasm/demo.o
 echo "wrote wasm/demo.o"
 
 if WASM_LD_BIN="$(find_wasm_ld)"; then

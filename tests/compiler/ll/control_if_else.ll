@@ -9,9 +9,16 @@ declare void @free(i8*)
 @x = global i32 0
 define i32 @main() {
 entry:
-  call i32 (i8*, ...) @scanf(i8* getelementptr ([3 x i8], [3 x i8]* @.scan.int, i32 0, i32 0), i32* @x)
+  store i32 7, i32* @x
   %t0 = load i32, i32* @x
-  %t1 = add i32 %t0, 1
-  call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.fmt.int, i32 0, i32 0), i32 %t1)
+  %t1 = icmp sgt i32 %t0, 5
+  br i1 %t1, label %if.then.0, label %if.else.1
+if.then.0:
+  call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.fmt.int, i32 0, i32 0), i32 1)
+  br label %if.end.2
+if.else.1:
+  call i32 (i8*, ...) @printf(i8* getelementptr ([4 x i8], [4 x i8]* @.fmt.int, i32 0, i32 0), i32 0)
+  br label %if.end.2
+if.end.2:
   ret i32 0
 }

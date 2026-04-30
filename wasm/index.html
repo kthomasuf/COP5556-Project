@@ -77,20 +77,34 @@
       margin-top: 16px;
     }
 
-    .row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+      align-items: end;
+    }
+
+    .field-grid.single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
     }
 
     label {
-      font-size: 14px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       color: #000000;
     }
 
     input {
-      width: 88px;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
       padding: 10px 12px;
       border: 1px solid #000000;
       border-radius: 0;
@@ -100,6 +114,7 @@
     }
 
     button {
+      width: 100%;
       padding: 10px 14px;
       border: 1px solid #000000;
       border-radius: 0;
@@ -117,11 +132,21 @@
     }
 
     .result {
-      margin-top: 14px;
       min-height: 22px;
       font-family: Menlo, Monaco, monospace;
       font-size: 14px;
-      color: #0f172a;
+      line-height: 1.45;
+      color: #000000;
+      overflow-wrap: anywhere;
+    }
+
+    .tile code {
+      padding: 1px 4px;
+      border: 1px solid #000000;
+      border-radius: 0;
+      background: #ffffff;
+      color: #000000;
+      font-size: 12px;
     }
 
     .export-list {
@@ -163,9 +188,11 @@
         <h2>AddOne</h2>
         <p>Simple arithmetic function.</p>
         <div class="controls">
-          <div class="row">
-            <label for="addone-value">value</label>
-            <input id="addone-value" type="number" value="41">
+          <div class="field-grid single">
+            <div class="field">
+              <label for="addone-value">Value</label>
+              <input id="addone-value" type="number" value="41">
+            </div>
           </div>
           <button id="addone-run" disabled>Run</button>
           <div id="addone-result" class="result"></div>
@@ -176,11 +203,15 @@
         <h2>MaxValue</h2>
         <p>Branching with <code>if/else</code>.</p>
         <div class="controls">
-          <div class="row">
-            <label for="max-left">left</label>
-            <input id="max-left" type="number" value="7">
-            <label for="max-right">right</label>
-            <input id="max-right" type="number" value="12">
+          <div class="field-grid">
+            <div class="field">
+              <label for="max-left">Left</label>
+              <input id="max-left" type="number" value="7">
+            </div>
+            <div class="field">
+              <label for="max-right">Right</label>
+              <input id="max-right" type="number" value="12">
+            </div>
           </div>
           <button id="max-run" disabled>Run</button>
           <div id="max-result" class="result"></div>
@@ -191,9 +222,11 @@
         <h2>SumToN</h2>
         <p>Looping with <code>while</code>.</p>
         <div class="controls">
-          <div class="row">
-            <label for="sum-limit">limit</label>
-            <input id="sum-limit" type="number" value="5">
+          <div class="field-grid single">
+            <div class="field">
+              <label for="sum-limit">Limit</label>
+              <input id="sum-limit" type="number" value="5">
+            </div>
           </div>
           <button id="sum-run" disabled>Run</button>
           <div id="sum-result" class="result"></div>
@@ -204,11 +237,15 @@
         <h2>CounterDemo</h2>
         <p>Class allocation, constructor, method call, and function return.</p>
         <div class="controls">
-          <div class="row">
-            <label for="counter-start">start</label>
-            <input id="counter-start" type="number" value="5">
-            <label for="counter-step">step</label>
-            <input id="counter-step" type="number" value="3">
+          <div class="field-grid">
+            <div class="field">
+              <label for="counter-start">Start</label>
+              <input id="counter-start" type="number" value="5">
+            </div>
+            <div class="field">
+              <label for="counter-step">Step</label>
+              <input id="counter-step" type="number" value="3">
+            </div>
           </div>
           <button id="counter-run" disabled>Run</button>
           <div id="counter-result" class="result"></div>
